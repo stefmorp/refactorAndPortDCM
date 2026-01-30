@@ -111,7 +111,7 @@ As a workaround, one would need to avoid using the enumerator "for(let variable 
 if (typeof(DuplicateContactsManager_Running) == "undefined") {
 	var DuplicateEntriesWindow = {
 		restart: false,
-		abManager : Components.classes["@mozilla.org/abmanager;1"].getService(Components.interfaces.nsIAbManager),
+		abManager : null, // set in init() from DuplicateEntriesWindowContacts
 
 		stringBundle: null,
 		stringBundle_old: null,
@@ -254,6 +254,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		 * Will be called by duplicateEntriesWindow.xul once the according window is loaded
 		 */
 		init: function() {
+			this.abManager = DuplicateEntriesWindowContacts.getAbManager();
 			do {
 				var Prefs = Components.classes["@mozilla.org/preferences-service;1"]
 					.getService(Components.interfaces.nsIPrefService);
@@ -517,7 +518,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			if (entryModified) {
 				this.vcardsSimplified[book][index] = null; // request reconstruction by getSimplifiedCard
 				try {
-					abDir.modifyCard(card);	// updates also LastModifiedDate
+					DuplicateEntriesWindowContacts.saveCard(abDir, card);
 					this.totalCardsChanged++;
 				} catch (e) {
 					alert("Internal error: cannot update card '"+card.displayName+"': "+e);
@@ -538,23 +539,14 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		 * Deletes the card identified by 'index' from the given address book.
 		 */
 		deleteAbCard: function(abDir, book, index, auto) {
-
 			var card = this.vcards[book][index];
-
-			/** delete from directory
-			 * 1) create nsISupportsArray containing the one card to be deleted
-			 * 2) call deleteCards ( nsISupportsArray cards )
-			 */
-			var deleteCards = Components.classes["@mozilla.org/array;1"]
-			                  .createInstance(Components.interfaces.nsIMutableArray);
-			deleteCards.appendElement(card, false);
 			try {
-				abDir.deleteCards(deleteCards);
+				DuplicateEntriesWindowContacts.deleteCard(abDir, card);
 				if (abDir == this.abDir1)
 					this.totalCardsDeleted1++;
 				else
 					this.totalCardsDeleted2++;
-				if(auto)
+				if (auto)
 					this.totalCardsDeletedAuto++;
 			} catch (e) {
 				alert("Internal error: cannot remove card '"+card.displayName+"': "+e);
@@ -1214,24 +1206,59 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			        (f2 == "")!=(l2 == "") && (subEq(f2,d1) || subEq(l2,d1)));   // only First/Last exists and matches other DisplayName
 		},
 
+		/**
+		 * Enriches a card with virtual properties used for comparison (__NonEmptyFields,
+		 * __CharWeight, __MailListNames, __Emails, __PhoneNumbers). Called by
+		 * DuplicateEntriesWindowContacts.getAllAbCards for each card.
+		 */
+		enrichCardForComparison: function(card, mailLists) {
+			var nonemptyFields = 0;
+			var charWeight = 0;
+			for (var index = 0; index < this.consideredFields.length; index++) {
+				var property = this.consideredFields[index];
+				if (this.isNumerical(property))
+					continue;
+				var defaultValue = this.defaultValue(property);
+				var value = card.getProperty(property, defaultValue);
+				if (value != defaultValue)
+					nonemptyFields += 1;
+				if (this.isText(property) || this.isEmail(property) || this.isPhoneNumber(property))
+					charWeight += this.charWeight(value, property);
+			}
+			card.setProperty('__NonEmptyFields', nonemptyFields);
+			card.setProperty('__CharWeight', charWeight);
+
+			var mailListNames = new Set();
+			var email = card.primaryEmail;
+			if (email) {
+				for (var i = 0; i < mailLists.length; i++) {
+					if (mailLists[i][1].includes(email))
+						mailListNames.add(mailLists[i][0]);
+				}
+			}
+			card.setProperty('__MailListNames', mailListNames);
+			card.setProperty('__Emails', this.propertySet(card, ['PrimaryEmail', 'SecondEmail']));
+			card.setProperty('__PhoneNumbers', this.propertySet(card, ['HomePhone', 'WorkPhone',
+				'FaxNumber', 'PagerNumber', 'CellularNumber']));
+		},
+
 		readAddressBooks: function() {
+			var Contacts = DuplicateEntriesWindowContacts;
 			if (!this.abDir1.isMailList) {
-				this.vcards[this.BOOK_1] = this.getAllAbCards(this.abDir1);
+				var result1 = Contacts.getAllAbCards(this.abDir1, this);
+				this.vcards[this.BOOK_1] = result1.cards;
 				this.vcardsSimplified[this.BOOK_1] = new Array();
-				this.totalCardsBefore = this.vcards[this.BOOK_1].length;
+				this.totalCardsBefore = result1.totalBefore;
 			}
 			if (this.abDir2 != this.abDir1 && !this.abDir2.isMailList) {
-				// we compare two (different) address books
-				this.vcards[this.BOOK_2] = this.getAllAbCards(this.abDir2);
+				var result2 = Contacts.getAllAbCards(this.abDir2, this);
+				this.vcards[this.BOOK_2] = result2.cards;
 				this.vcardsSimplified[this.BOOK_2] = new Array();
-				this.totalCardsBefore += this.vcards[this.BOOK_2].length;
-			}
-			else {
-				// we operate on a single address book
-				this.vcards[this.BOOK_2] =  this.vcards[this.BOOK_1];
+				this.totalCardsBefore += result2.totalBefore;
+			} else {
+				this.vcards[this.BOOK_2] = this.vcards[this.BOOK_1];
 				this.vcardsSimplified[this.BOOK_2] = this.vcardsSimplified[this.BOOK_1];
 			}
-
 		},
 
 		/**
@@ -1301,78 +1328,6 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 					result.add(value);
 			}
 			return result;
-		},
-
-		/**
-		 * Returns all cards from a directory in an array.
-		 */
-		getAllAbCards: function(directory) {
-			// Returns arrays with all vCards and mailing lists within given address book directory
-			var abCards = new Array;
-			let mailLists = new Array;
-			const abCardsEnumerator = directory.QueryInterface(Components.interfaces.nsIAbDirectory).childCards;
-			if (abCardsEnumerator) {
-				try {
-					while (abCardsEnumerator.hasMoreElements()) {
-						const abCard = abCardsEnumerator.getNext();
-						if (abCard != null && abCard instanceof Components.interfaces.nsIAbCard) {
-							if (abCard.isMailList) {
-								const addressList = this.abManager.getDirectory(abCard.mailListURI).addressLists;
-								var primaryEmails = new Array;
-								for(let i = 0; i < addressList.length; i++)
-									primaryEmails.push(addressList.queryElementAt(i,
-									                    Components.interfaces.nsIAbCard).primaryEmail);
-								mailLists.push([abCard.displayName, primaryEmails]);
-							}
-							else
-								abCards.push(abCard);
-						}
-					}
-				}
-				catch (ex) {
-					// Return empty array
-				}
-			}
-			for(let i = 0; i < abCards.length; i++) {
-				const abCard = abCards[i];
-
-				// calculate nonemptyFields and charWeight
-				var nonemptyFields = 0;
-				var charWeight = 0;
-				for(let index = 0; index < this.consideredFields.length; index++) {
-					const property = this.consideredFields[index];
-					if (this.isNumerical(property))
-						continue; /* ignore PopularityIndex, LastModifiedDate and other integers */
-					const defaultValue = this.defaultValue(property);
-					const value = abCard.getProperty(property, defaultValue);
-					if (value != defaultValue)
-						nonemptyFields += 1;
-					if (this.isText(property) || this.isEmail(property) || this.isPhoneNumber(property)) {
-						/* const tranformed_value = this.getTransformedProperty(c1, property); */
-						charWeight += this.charWeight(value, property);
-					}
-				}
-				abCard.setProperty('__NonEmptyFields', nonemptyFields);
-				abCard.setProperty('__CharWeight'    , charWeight);
-
-				// record all mailing lists that the card belongs to
-				var mailListNames = new Set();
-				const email = abCard.primaryEmail; // only this email address is relevant
-				if (email)
-					mailLists.forEach(function ([displayName, primaryEmails]) {
-						if (primaryEmails.includes(email))
-							mailListNames.add(displayName);
-					})
-				abCard.setProperty('__MailListNames', mailListNames);
-
-				// set further virtual properties
-				// treat email addresses as a set
-				abCard.setProperty('__Emails', this.propertySet(abCard, ['PrimaryEmail', 'SecondEmail']));
-				// treat phone numbers as a set
-				abCard.setProperty('__PhoneNumbers', this.propertySet(abCard, ['HomePhone', 'WorkPhone',
-				                              'FaxNumber', 'PagerNumber', 'CellularNumber']));
-			}
-			return abCards;
 		},
 
 		propertyUnion: function(c1, c2) {

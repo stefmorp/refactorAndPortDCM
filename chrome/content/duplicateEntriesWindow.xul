@@ -10,6 +10,7 @@
 	xmlns:html="http://www.w3.org/1999/xhtml"
 	onload="DuplicateEntriesWindow.init()"
 	onunload="DuplicateEntriesWindow.OnUnloadWindow()">
+	<script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateEntriesWindowContacts.js"/>
 	<script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateEntriesWindow.js"/>
 	<stringbundleset id="duplicateContactsManagerStringbundleset">
 		<stringbundle id="bundle_duplicateContactsManager" src="chrome://duplicatecontactsmanager/locale/duplicateContactsManager.properties" />
