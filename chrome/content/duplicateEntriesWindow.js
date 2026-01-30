@@ -71,43 +71,6 @@
    https://developer.mozilla.org/en-US/docs/Mozilla/Thunderbird/Address_Book_Examples
 */
 
-Set.prototype.isSuperset = function(other) {
-	for(let elem of other) {
-		if (!this.has(elem)) {
-			return false;
-		}
-	}
-	return true;
-}
-
-Set.prototype.toString = function() {
-	return "{" + Array.from(this).join(", ") + "}";
-}
-
-function pushIfNew(elem, array) { /* well, this 'function' has a side effect on array */
-	if (!array.includes(elem))
-		array.push(elem);
-	return array;
-}
-/*
-T.prototype.pushIfNew = function(elem) {
-	if (!this.includes(elem))
-		this.push(elem);
-	return this;
-where T = Array would be an elegant extension of the built-in JS type Array. Yet in TB this not allowed for security and compatibility reasons.
-It also would have the weird effect of adding an extra enumerable value to each array, as described here:
-https://stackoverflow.com/questions/948358/adding-custom-functions-into-array-prototype
-The following does not really work better:
-Object.defineProperty(Array.prototype, 'insert', {
-	enumerable: false,
-	value: function (elem) {
-	if (!this.includes(elem))
-		this.push(elem);
-	return this; }
-});
-As a workaround, one would need to avoid using the enumerator "for(let variable in ...)"
-*/
-
 if (typeof(DuplicateContactsManager_Running) == "undefined") {
 	var DuplicateEntriesWindow = {
 		restart: false,
@@ -514,32 +477,10 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		},
 
 		/**
-		 * Marks the side specified by the parameter 'left' or 'right' as to be kept.
-		 * If no parameter is given (or the side parameter is null) the selection is toggled.
+		 * Marks the side specified by 'left' or 'right' as to be kept. Delegates to DuplicateEntriesWindowUI.
 		 */
 		setContactLeftRight: function(side) {
-			if (!side)
-				side = keepLeftRadioButton.getAttribute('selected') == 'true' ? 'right' : 'left';
-			if (side != this.sideKept) {
-				this.sideKept = side;
-				const other = side == 'right' ? 'left' : 'right';
-				const to_be_kept    = this.getString('to_be_kept');
-				const to_be_removed = this.getString('to_be_removed');
-				this.keepLeftRadioButton .label = side == 'right' ? to_be_removed : to_be_kept;
-				this.keepRightRadioButton.label = side == 'right' ? to_be_kept : to_be_removed;
-				this.keepLeftRadioButton .setAttribute('selected', side == 'right' ? 'false' : 'true');
-				this.keepRightRadioButton.setAttribute('selected', side == 'right' ? 'true' : 'false');
-				document.getElementById('headerLeft' ).className = side == 'right' ? 'remove' : 'keep';
-				document.getElementById('headerRight').className = side == 'right' ? 'keep': 'remove';
-				for(let index = 0; index < this.displayedFields.length; index++) {
-					var cell1 = document.getElementById('cell_' + side  + '_' + this.displayedFields[index]);
-					var cell2 = document.getElementById('cell_' + other + '_' + this.displayedFields[index]);
-					if (cell1.className == 'remove')
-						  cell1.className = 'keep';
-					if (cell2.className == 'keep')
-						  cell2.className = 'remove';
-				}
-			}
+			DuplicateEntriesWindowUI.setContactLeftRight(this, side);
 		},
 
 		/**
@@ -561,63 +502,31 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			return DuplicateEntriesWindowCardValues.propertySet(this, card, properties);
 		},
 
-/*
-		readFile: function(url, async, binary) {
-			if (url) {
-				const req = new XMLHttpRequest();
-				req.op en('GET', url, async);  // async == `false` makes the request synchronous
-				if (binary)
-					req.overrideMimeType('text/plain; charset=x-user-defined')
-				try {
-					req.send(null);
-				} catch(e) {
-					return null;
-				}
-				var responseText = req.status == 200 ? req.responseText : null;
-				if (binary && responseText) {
-					const responseTextLen = responseText.length;
-					let data = '';
-					for(let i = 0; i < responseTextLen; i+=1)
-						data += String.fromCharCode(responseText.charCodeAt(i) & 0xff)
-					responseText = data;
-				}
-				return responseText;
-			}
-			return null;
-		},
-*/
-
 		/** Delegates to DuplicateEntriesWindowComparison.compareCards; context is this (window). */
 		abCardsCompare: function(c1, c2) {
 			return DuplicateEntriesWindowComparison.compareCards(c1, c2, this);
 		},
 
 		enable: function(id) {
-			const elem = document.getElementById(id);
-			elem.setAttribute('disabled', 'false');
-			elem.className = '';
+			DuplicateEntriesWindowUI.enable(id);
 		},
 		disable: function(id) {
-			const elem = document.getElementById(id);
-			elem.setAttribute('disabled', 'true');
-			elem.className = 'disabled';
+			DuplicateEntriesWindowUI.disable(id);
 		},
-
 		show: function(id) {
-			document.getElementById(id).style.display=''; /* remove display property, restoring default */
-		},
-		show_hack: function(id) {
-			document.getElementById(id).style.display='-moz-inline-stack'; /* enables scroll bar and stretches horizonally */
+			DuplicateEntriesWindowUI.show(id);
 		},
 		hide: function(id) {
-			document.getElementById(id).style.display='none';
+			DuplicateEntriesWindowUI.hide(id);
 		},
-
+		show_hack: function(id) {
+			DuplicateEntriesWindowUI.show_hack(id);
+		},
 		make_visible: function(id) {
-			document.getElementById(id).style.visibility='visible';
+			DuplicateEntriesWindowUI.make_visible(id);
 		},
 		make_invisible: function(id) {
-			document.getElementById(id).style.visibility='hidden';
+			DuplicateEntriesWindowUI.make_invisible(id);
 		},
 
 		getPrunedProperty: function(card, property) {

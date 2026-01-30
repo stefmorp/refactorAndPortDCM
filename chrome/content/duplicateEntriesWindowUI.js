@@ -1,9 +1,9 @@
 // -*- mode: js; indent-tabs-mode: t; js-indent-level: 8 -*-
 // file: duplicateEntriesWindowUI.js
 //
-// Grouped UI state transitions, progress display, and finished stats for the duplicate-entries window.
-// ctx must have: enable(id), disable(id), show(id), hide(id), make_visible(id), make_invisible(id), show_hack(id),
-// getString, and optionally window. For updateProgress/updateDeletedInfo/showFinishedStats: progressmeter, progresstext,
+// Grouped UI state transitions, progress display, finished stats, low-level DOM helpers, and setContactLeftRight.
+// This module provides enable, disable, show, hide, make_visible, make_invisible, show_hack (by id); the main window delegates to them.
+// ctx must have: getString, and optionally window. For updateProgress/updateDeletedInfo/showFinishedStats: progressmeter, progresstext,
 // vcards, BOOK_1, BOOK_2, abDir1, abDir2, deferInteractive, nowHandling, positionSearch, positionDuplicates, duplicates,
 // totalCardsDeleted1, totalCardsDeleted2, totalCardsDeletedAuto, totalCardsBefore, totalCardsChanged, totalCardsSkipped,
 // consideredFields, isSet, matchablesList, ignoredFields, nonequivalentProperties.
@@ -12,11 +12,81 @@
 var DuplicateEntriesWindowUI = (function() {
 	"use strict";
 
+	function enable(id) {
+		var elem = document.getElementById(id);
+		elem.setAttribute('disabled', 'false');
+		elem.className = '';
+	}
+	function disable(id) {
+		var elem = document.getElementById(id);
+		elem.setAttribute('disabled', 'true');
+		elem.className = 'disabled';
+	}
+	function show(id) {
+		document.getElementById(id).style.display = '';
+	}
+	function show_hack(id) {
+		document.getElementById(id).style.display = '-moz-inline-stack';
+	}
+	function hide(id) {
+		document.getElementById(id).style.display = 'none';
+	}
+	function make_visible(id) {
+		document.getElementById(id).style.visibility = 'visible';
+	}
+	function make_invisible(id) {
+		document.getElementById(id).style.visibility = 'hidden';
+	}
+
+	/**
+	 * Marks the side specified by 'left' or 'right' as to be kept. If side is null/undefined, toggles from current radio state.
+	 * ctx must have: keepLeftRadioButton, keepRightRadioButton, getString, sideKept, displayedFields.
+	 */
+	function setContactLeftRight(ctx, side) {
+		if (!side)
+			side = ctx.keepLeftRadioButton.getAttribute('selected') == 'true' ? 'right' : 'left';
+		if (side != ctx.sideKept) {
+			ctx.sideKept = side;
+			var other = side == 'right' ? 'left' : 'right';
+			var to_be_kept = ctx.getString('to_be_kept');
+			var to_be_removed = ctx.getString('to_be_removed');
+			ctx.keepLeftRadioButton.label = side == 'right' ? to_be_removed : to_be_kept;
+			ctx.keepRightRadioButton.label = side == 'right' ? to_be_kept : to_be_removed;
+			ctx.keepLeftRadioButton.setAttribute('selected', side == 'right' ? 'false' : 'true');
+			ctx.keepRightRadioButton.setAttribute('selected', side == 'right' ? 'true' : 'false');
+			document.getElementById('headerLeft').className = side == 'right' ? 'remove' : 'keep';
+			document.getElementById('headerRight').className = side == 'right' ? 'keep' : 'remove';
+			if (ctx.displayedFields) {
+				for (var i = 0; i < ctx.displayedFields.length; i++) {
+					var cell1 = document.getElementById('cell_' + side + '_' + ctx.displayedFields[i]);
+					var cell2 = document.getElementById('cell_' + other + '_' + ctx.displayedFields[i]);
+					if (cell1 && cell1.className == 'remove')
+						cell1.className = 'keep';
+					if (cell2 && cell2.className == 'keep')
+						cell2.className = 'remove';
+				}
+			}
+		}
+	}
+
 	/**
 	 * Ready state: intro visible, address book choice, Quit; action buttons visible but disabled; no progress/table/Stop.
 	 */
 	function showReadyState(ctx) {
-		ctx.hide('statusAddressBook1');
+		hide('statusAddressBook1');
+		hide('statusAddressBook2');
+		hide('progressMeter');
+		hide('tablepane');
+		hide('endinfo');
+		make_visible('skipnextbutton');
+		make_visible('keepnextbutton');
+		make_visible('applynextbutton');
+		disable('skipnextbutton');
+		disable('keepnextbutton');
+		disable('applynextbutton');
+		hide('stopbutton');
+		show('quitbutton');
+		show('explanation');
 		ctx.hide('statusAddressBook2');
 		ctx.hide('progressMeter');
 		ctx.hide('tablepane');
@@ -36,24 +106,24 @@ var DuplicateEntriesWindowUI = (function() {
 	 * Searching state: progress and address book counts visible, Stop, table area; no intro/Quit; Start disabled.
 	 */
 	function showSearchingState(ctx) {
-		ctx.hide('explanation');
-		ctx.hide('endinfo');
-		ctx.show('progressMeter');
-		ctx.show('statusAddressBook1');
-		ctx.show('statusAddressBook2');
-		ctx.show('stopbutton');
-		ctx.hide('quitbutton');
-		ctx.show_hack('tablepane');
-		ctx.disable('startbutton');
+		hide('explanation');
+		hide('endinfo');
+		show('progressMeter');
+		show('statusAddressBook1');
+		show('statusAddressBook2');
+		show('stopbutton');
+		hide('quitbutton');
+		show_hack('tablepane');
+		disable('startbutton');
 	}
 
 	/**
 	 * Duplicate pair state: enable Skip / Keep / Apply and remove wait cursor (user can act on the pair).
 	 */
 	function showDuplicatePairState(ctx) {
-		ctx.enable('skipnextbutton');
-		ctx.enable('keepnextbutton');
-		ctx.enable('applynextbutton');
+		enable('skipnextbutton');
+		enable('keepnextbutton');
+		enable('applynextbutton');
 		if (ctx.window)
 			ctx.window.removeAttribute('wait-cursor');
 	}
@@ -62,39 +132,39 @@ var DuplicateEntriesWindowUI = (function() {
 	 * Disable Skip / Keep / Apply (e.g. while searching for next pair).
 	 */
 	function disableDuplicateActionButtons(ctx) {
-		ctx.disable('skipnextbutton');
-		ctx.disable('keepnextbutton');
-		ctx.disable('applynextbutton');
+		disable('skipnextbutton');
+		disable('keepnextbutton');
+		disable('applynextbutton');
 	}
 
 	/**
 	 * Finished state: hide table and Stop, show Quit and end summary; enable Start (as Restart).
 	 */
 	function showFinishedState(ctx) {
-		ctx.hide('tablepane');
-		ctx.make_invisible('skipnextbutton');
-		ctx.make_invisible('keepnextbutton');
-		ctx.make_invisible('applynextbutton');
+		hide('tablepane');
+		make_invisible('skipnextbutton');
+		make_invisible('keepnextbutton');
+		make_invisible('applynextbutton');
 		if (ctx.window)
 			ctx.window.removeAttribute('wait-cursor');
-		ctx.hide('stopbutton');
-		ctx.show('quitbutton');
-		ctx.show('endinfo');
-		ctx.enable('startbutton');
+		hide('stopbutton');
+		show('quitbutton');
+		show('endinfo');
+		enable('startbutton');
 	}
 
 	/**
 	 * Show the comparison table header row.
 	 */
 	function showComparisonTableHeader(ctx) {
-		ctx.make_visible('tableheader');
+		make_visible('tableheader');
 	}
 
 	/**
 	 * Hide the comparison table header row.
 	 */
 	function hideComparisonTableHeader(ctx) {
-		ctx.make_invisible('tableheader');
+		make_invisible('tableheader');
 	}
 
 	/**
@@ -150,6 +220,14 @@ var DuplicateEntriesWindowUI = (function() {
 	}
 
 	return {
+		enable: enable,
+		disable: disable,
+		show: show,
+		hide: hide,
+		show_hack: show_hack,
+		make_visible: make_visible,
+		make_invisible: make_invisible,
+		setContactLeftRight: setContactLeftRight,
 		showReadyState: showReadyState,
 		showSearchingState: showSearchingState,
 		showDuplicatePairState: showDuplicatePairState,

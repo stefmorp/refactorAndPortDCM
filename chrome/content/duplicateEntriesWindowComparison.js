@@ -3,6 +3,19 @@
 //
 // Card comparison logic: "equivalent or less information" and preference for deletion.
 // Used by duplicateEntriesWindow.js. Load after duplicateEntriesWindowMatching.js, before duplicateEntriesWindow.js.
+// Set.prototype.isSuperset/toString are defined here for use by Display (and Comparison internals).
+
+Set.prototype.isSuperset = function(other) {
+	for (var elem of other) {
+		if (!this.has(elem))
+			return false;
+	}
+	return true;
+};
+
+Set.prototype.toString = function() {
+	return "{" + Array.from(this).join(", ") + "}";
+};
 
 var DuplicateEntriesWindowComparison = (function() {
 	"use strict";
