@@ -255,12 +255,8 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			this.attributesTableRows = document.getElementById('AttributesTableRows');
 			this.keepLeftRadioButton = document.getElementById('keepLeft');
 			this.keepRightRadioButton = document.getElementById('keepRight');
-			this.hide('statusAddressBook1');
-			this.hide('statusAddressBook2');
-			this.hide('progressMeter');
 			this.progresstext.value = "";
-			this.hide('tablepane');
-			this.hide('endinfo');
+			DuplicateEntriesWindowUI.showReadyState(this);
 
 			if (!this.abManager || !this.abManager.directories || this.abManager.directories.length == 0) {
 				this.disable('startbutton');
@@ -301,15 +297,6 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			this.statustext.className = ''; /* not 'with-progress' */
 			this.statustext.textContent = this.getString('PleasePressStart');
 			document.getElementById('startbutton').setAttribute('label', this.getString('Start'));
-			this.make_visible('skipnextbutton');
-			this.make_visible('keepnextbutton');
-			this.make_visible('applynextbutton');
-			this.disable('skipnextbutton');
-			this.disable('keepnextbutton');
-			this.disable('applynextbutton');
-			this.hide('stopbutton');
-			this.show('quitbutton');
-			this.show('explanation');
 			document.getElementById('startbutton').focus();
 		},
 
@@ -373,22 +360,14 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			this.prefsBranch.setCharPref('countryCallingCode', this.countryCallingCode);
 			this.prefsBranch.setCharPref('ignoreFields', this.ignoredFields.join(", "));
 
-			// hide intro info, show table, progress, etc.
-			this.hide('explanation');
 			this.purgeAttributesTable();
-			this.hide('endinfo');
-			this.show('progressMeter');
+			DuplicateEntriesWindowUI.showSearchingState(this);
 			this.statustext.className = 'with-progress';
 			this.statustext.textContent = this.getString('SearchingForDuplicates');
 			document.getElementById('statusAddressBook1_label').value = this.abDir1.dirName;
 			document.getElementById('statusAddressBook2_label').value = this.abDir2.dirName;
 			this.updateDeletedInfo('statusAddressBook1_size' , this.BOOK_1, 0);
 			this.updateDeletedInfo('statusAddressBook2_size' , this.BOOK_2, 0);
-			this.show('statusAddressBook1');
-			this.show('statusAddressBook2');
-			this.show('stopbutton');
-			this.hide('quitbutton');
-			this.show_hack('tablepane');
 
 			// re-initialization needed in case of restart:
 			while (ablist.firstChild)
@@ -405,7 +384,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			this.totalCardsDeleted2 = 0;
 			this.totalCardsDeletedAuto = 0;
 			this.updateProgress();
-			this.disable('startbutton');
+			DuplicateEntriesWindowUI.disableDuplicateActionButtons(this);
 			this.searchNextDuplicate();
 		},
 
@@ -420,9 +399,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		searchNextDuplicate: function() {
 			this.purgeAttributesTable();
 			if (!this.nowHandling) {
-				this.disable('skipnextbutton');
-				this.disable('keepnextbutton');
-				this.disable('applynextbutton');
+				DuplicateEntriesWindowUI.disableDuplicateActionButtons(this);
 				this.window.setAttribute('wait-cursor', 'true');
 				this.statustext.className = 'with-progress';
 				this.statustext.textContent = this.getString('SearchingForDuplicates');
@@ -638,10 +615,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 							this.duplicates.push([this.position1, this.position2]);
 						}
 						else {
-							this.enable('skipnextbutton');
-							this.enable('keepnextbutton');
-							this.enable('applynextbutton');
-							this.window.removeAttribute('wait-cursor');
+							DuplicateEntriesWindowUI.showDuplicatePairState(this);
 							this.statustext.className = 'with-progress';
 							this.statustext.textContent = this.getString(
 							                        nomatch ? 'noMatch' : 'matchFound');
@@ -656,13 +630,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		},
 
 		endSearch: function() {
-			// hide table etc.
-			this.hide('tablepane');
-
-			this.make_invisible('skipnextbutton');
-			this.make_invisible('keepnextbutton');
-			this.make_invisible('applynextbutton');
-			this.window.removeAttribute('wait-cursor');
+			DuplicateEntriesWindowUI.showFinishedState(this);
 			this.statustext.className = 'with-progress';
 			this.statustext.textContent = this.getString('finished');
 
@@ -678,12 +646,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 				filter(x => !this.isSet(x) && !this.matchablesList.includes(x)).join(", ");
 			document.getElementById('resultIgnoredFields').textContent = this.ignoredFields.join(", ");
 			document.getElementById('resultDiffProps').textContent = this.nonequivalentProperties.join(", ");
-			this.hide('stopbutton');
-			this.show('quitbutton');
-			this.show('endinfo');
-
 			document.getElementById('startbutton').setAttribute('label', this.getString('Restart'));
-			this.enable('startbutton');
 			this.restart = true;
 		},
 
@@ -776,7 +739,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			this.purgeAttributesTable();
 			this.displayedFields = new Array();
 			this.editableFields = new Array();
-			this.make_visible('tableheader');
+			DuplicateEntriesWindowUI.showComparisonTableHeader(this);
 			const cardsEqu = document.getElementById('cardsEqu');
 			cardsEqu.value = comparison == -2 ? '' :
 			                 comparison == 0 ? '≅' : // &cong; yields syntax error; &#8773; verbatim
@@ -1147,7 +1110,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		 * Removes all rows (excluding header) from the attribute comparison & edit table.
 		 */
 		purgeAttributesTable: function() {
-			this.make_invisible('tableheader');
+			DuplicateEntriesWindowUI.hideComparisonTableHeader(this);
 			while(this.attributesTableRows.firstChild.nextSibling) {
 				this.attributesTableRows.removeChild(this.attributesTableRows.firstChild.nextSibling);
 			}
