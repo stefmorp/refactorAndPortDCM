@@ -250,6 +250,19 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			return result;
 		},
 
+		/** Returns config object for DuplicateEntriesWindowMatching (normalization). */
+		getNormalizationConfig: function() {
+			return {
+				isText: this.isText.bind(this),
+				isPhoneNumber: this.isPhoneNumber.bind(this),
+				natTrunkPrefix: this.natTrunkPrefix,
+				countryCallingCode: this.countryCallingCode,
+				natTrunkPrefixReqExp: this.natTrunkPrefixReqExp,
+				intCallPrefix: this.intCallPrefix,
+				intCallPrefixReqExp: this.intCallPrefixReqExp
+			};
+		},
+
 		/**
 		 * Will be called by duplicateEntriesWindow.xul once the according window is loaded
 		 */
@@ -660,15 +673,14 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 				var simplified_card2 = this.getSimplifiedCard(this.BOOK_2, this.position2);
 				if (simplified_card1['_AimScreenName'] != simplified_card2['_AimScreenName'])
 					continue; // useful for manual differentiation to prevent repeated treatment
-				var namesmatch = this.namesMatch(simplified_card1, simplified_card2);
-				/* if (simplified_card1['DisplayName'] == simplified_card2['DisplayName'])
-					this.debug("namesmatch = "+namesmatch+" for "+simplified_card1['DisplayName']+" vs. "+simplified_card2['DisplayName']); */
-				var mailsmatch = this.mailsMatch(simplified_card1, simplified_card2);
-				var phonesmatch = this.phonesMatch(simplified_card1, simplified_card2);
-				var nomailsphonesmatch = this.noMailsPhonesMatch(simplified_card1) &&
-				                         this.noMailsPhonesMatch(simplified_card2);
-				var nomatch = this.noNamesMatch(simplified_card1) &&
-				              this.noNamesMatch(simplified_card2) && nomailsphonesmatch;  // pathological case
+				var M = DuplicateEntriesWindowMatching;
+				var namesmatch = M.namesMatch(simplified_card1, simplified_card2);
+				var mailsmatch = M.mailsMatch(simplified_card1, simplified_card2);
+				var phonesmatch = M.phonesMatch(simplified_card1, simplified_card2);
+				var nomailsphonesmatch = M.noMailsPhonesMatch(simplified_card1) &&
+				                        M.noMailsPhonesMatch(simplified_card2);
+				var nomatch = M.noNamesMatch(simplified_card1) &&
+				              M.noNamesMatch(simplified_card2) && nomailsphonesmatch;  // pathological case
 				if (namesmatch || mailsmatch || phonesmatch || nomatch) {
 					// OK, we found something that looks like a duplicate or cannot match anything.
 					var card1 = this.vcards[this.BOOK_1][this.position1];
@@ -754,61 +766,37 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			return value+""; // force string even when isSelection or isNumerical
 		},
 
-		transformMiddlePrefixName: function(fn, ln) {
-			var p;
-			// move any wrongly attached middle initial(s) from last name to first name
-			var middlenames = "";
-			while ((p = ln.match(/^\s*([A-Za-z])\s+(.*)$/))) {
-				middlenames += " "+p[1];
-				ln = p[2];
-			}
-			// move any wrongly attached name prefix(es) from first name to last name
-			var nameprefixes = "";
-			while ((p = fn.match(/^(.+)\s(von|van|und|and|für|for|zum|zur|der|de|geb|ben)\s*$/))) {
-				fn = p[1];
-				nameprefixes = p[2]+" "+nameprefixes;
-			}
-			fn = fn.replace(/^\s+/, "").replace(/\s+$/, "") + middlenames;
-			ln = nameprefixes + ln.replace(/^\s+/, "").replace(/\s+$/, "");
-			return [fn, ln];
-		},
-
 		getTransformedProperty: function(card, property) {
-			// first step: pruning
 			var value = this.getPrunedProperty(card, property);
-
-			// second step: transformation
+			var M = DuplicateEntriesWindowMatching;
 			if (this.isFirstLastDisplayName(property)) {
-				var p;
+				var p, fn, ln;
 				if (property == 'DisplayName') {
-					// correct order of first and last name
 					if ((p = value.match(/^([^,]+),\s+(.+)$/))) {
-						[fn, ln] = this.transformMiddlePrefixName(p[2], p[1]);
+						[fn, ln] = M.transformMiddlePrefixName(p[2], p[1]);
 						value = fn + " " + ln;
 					}
 					return value;
 				}
-				var fn = this.getPrunedProperty(card, 'FirstName');
-				var ln = this.getPrunedProperty(card,  'LastName');
-				// correct order of first and last name
+				fn = this.getPrunedProperty(card, 'FirstName');
+				ln = this.getPrunedProperty(card,  'LastName');
 				if (/,\s*$/.test(fn)) {
 					ln = fn.replace(/,\s*$/,"");
 					fn = this.getProperty(card, 'LastName');
-				}
-				else {
+				} else {
 					if ((p = fn.match(/^([^,]+),\s+(.+)$/))) {
 						fn = p[2]+(ln != "" ? " "+ln : "");
 						ln = p[1];
 					}
 				}
-				[fn, ln] = this.transformMiddlePrefixName(fn, ln);
+				[fn, ln] = M.transformMiddlePrefixName(fn, ln);
 				return (property == 'FirstName' ? fn : ln);
 			}
 			return value;
 		},
 
 		getAbstractedTransformedProperty: function(card, property) {
-			return this.abstract(this.getTransformedProperty(card, property), property);
+			return DuplicateEntriesWindowMatching.abstract(this.getTransformedProperty(card, property), property, this.getNormalizationConfig());
 		},
 
 		/**
@@ -821,11 +809,11 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 				var card = this.vcards[book][i].QueryInterface(Components.interfaces.nsIAbCard);
 				var vcard = new Object();
 				[vcard['FirstName'], vcard['LastName'], vcard['DisplayName']] =
-				       this.completeFirstLastDisplayName(
-					[this.getAbstractedTransformedProperty(card,   'FirstName'),
-					 this.getAbstractedTransformedProperty(card,    'LastName'),
-					 this.getAbstractedTransformedProperty(card, 'DisplayName')],
-					card);
+					this.completeFirstLastDisplayName(
+						[this.getAbstractedTransformedProperty(card,   'FirstName'),
+						 this.getAbstractedTransformedProperty(card,    'LastName'),
+						 this.getAbstractedTransformedProperty(card, 'DisplayName')],
+						card);
 				vcard['_AimScreenName'] = this.getAbstractedTransformedProperty(card,'_AimScreenName');
 				vcard[  'PrimaryEmail'] = this.getAbstractedTransformedProperty(card,  'PrimaryEmail');
 				vcard[   'SecondEmail'] = this.getAbstractedTransformedProperty(card,   'SecondEmail');
@@ -1099,49 +1087,6 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		},
 
 		/**
-		 * Check if all email addresses and matchable phone numbers in a card are empty
-		 */
-		noMailsPhonesMatch: function(vcard) {
-			// strings are already abstracted, e.g., normalized to lowercase
-			// numbers are already abstracted, e.g., non-digits are stripped
-			return vcard['PrimaryEmail'] == "" && vcard['SecondEmail'] == "" &&
-			       vcard['Phone1'] == "" && vcard['Phone2'] == "" && vcard['Phone3'] == "";
-		},
-
-		/**
-		 * Check if all matchable fields in a card are empty
-		 */
-		noNamesMatch: function(vcard) {
-			// strings are already abstracted, e.g., normalized to lowercase
-			// numbers are already abstracted, e.g., non-digits are stripped
-			return vcard[  'FirstName'] == "" && vcard['LastName'] == "" &&
-			       vcard['DisplayName'] == "" && vcard['_AimScreenName'] == "";
-		},
-
-		/**
-		 * Check for non-empty intersection of matchable phone numbers in two cards
-		 */
-		phonesMatch: function(vcard1, vcard2) {
-			// numbers are already abstracted, e.g., non-digits are stripped
-			var [a1, a2, a3] = [vcard1['Phone1'], vcard1['Phone2'], vcard1['Phone3']];
-			var [b1, b2, b3] = [vcard2['Phone1'], vcard2['Phone2'], vcard2['Phone3']];
-			return ((a1 != "" && (a1 == b1 || a1 == b2 || a1 == b3)) ||
-			        (a2 != "" && (a2 == b1 || a2 == b2 || a2 == b3)) ||
-			        (a3 != "" && (a3 == b1 || a3 == b2 || a3 == b3)) );
-		},
-
-		/**
-		 * Check for non-empty intersection of the sets of email addresses in the cards
-		 */
-		mailsMatch: function(vcard1, vcard2) {
-			// strings are already abstracted, e.g., normalized to lowercase
-			var [a1, a2] = [vcard1['PrimaryEmail'], vcard1['SecondEmail']];
-			var [b1, b2] = [vcard2['PrimaryEmail'], vcard2['SecondEmail']];
-			return ((a1 != "" && (a1 == b1 || a1 == b2)) ||
-			        (a2 != "" && (a2 == b1 || a2 == b2)) );
-		},
-
-		/**
 		 * Complete FirstName, LastName, and DisplayName if needed (and easily possible)
 		 * from each other, else from PrimaryEmail or SecondEmail of card
 		 */
@@ -1163,47 +1108,16 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 				if(!p)
 					p = getFirstLastFromEmail(this.getPrunedProperty(card, 'SecondEmail'));
 				if (p) {
+					var cfg = this.getNormalizationConfig();
 					if (fn == "")
-						fn = this.abstract(p[1].replace(/[0-9]/g, ''),'FirstName'); // strip digits, then abstract
+						fn = DuplicateEntriesWindowMatching.abstract(p[1].replace(/[0-9]/g, ''), 'FirstName', cfg);
 					if (ln == "")
-						ln = this.abstract(p[2].replace(/[0-9]/g, ''), 'LastName'); // strip digits, then abstract
+						ln = DuplicateEntriesWindowMatching.abstract(p[2].replace(/[0-9]/g, ''), 'LastName', cfg);
 					if (dn == "")
 						dn = fn+" "+ln;
 				}
 			}
 			return [fn, ln, dn];
-		},
-
-		/**
-		 * Compares the names in two cards and returns true if they seem to match.
-		 */
-		namesMatch: function(vcard1, vcard2) {
-			// vcards  are already abstracted and with names completed
-			// strings are already abstracted, e.g., normalized to lowercase
-			function subEq(name1, name2) { /* Check if one name is equal to or non-empty substring (with ' ' border) of other name  */
-				function subEq1(name1, name2) { /* Check if name2 is non-empty substring (with ' ' border) of name1 */
-					return name2 != "" && name2.length + 2 <= name1.length && (
-					       name1.startsWith(name2+" ") ||
-					       name1.includes(" "+name2+" ") ||
-					       name1.endsWith(" "+name2));
-				}
-				return (name1 == name2) /* includes both empty */ ||
-				       subEq1(name1, name2) || subEq1(name2, name1);
-			}
-			const f1 = vcard1[  'FirstName'], l1 = vcard1[      'LastName'];
-			const f2 = vcard2[  'FirstName'], l2 = vcard2[      'LastName'];
-			const d1 = vcard1['DisplayName'], a1 = vcard1['_AimScreenName'];
-			const d2 = vcard2['DisplayName'], a2=  vcard2['_AimScreenName'];
-			// this.debug("namesMatch: "+f1+"#"+l1+"#"+d1+ " vs. " +f2+"#"+l2+"#"+d2);
-			return ( a1 != "" &&               subEq(a1,a2)                 ) || // _AimScreenNames exist and match
-			       ( d1 != "" &&d1.match(/ /)==d2.match(/ /)&& subEq(d1,d2) ) || // both DisplayNames consist of one word or more than one word and match
-			       ( f1 != "" && l1 != ""  &&  subEq(f1,f2) && subEq(l1,l2) ) || // FirstNames and LastNames exist and match
-			       ( d1 == "" && d2 == "" &&
-			        (f1 != "" || l1 != "") &&  subEq(f1,f2) && subEq(l1,l2) ) || // no DisplayNames, but FirstNames and LastNames match
-			       ( d1 == "" && d2 != "" &&
-			        (f1 == "")!=(l1 == "") && (subEq(f1,d2) || subEq(l1,d2))) || // only First/Last exists and matches other DisplayName
-			       ( d2 == "" && d1 != "" &&
-			        (f2 == "")!=(l2 == "") && (subEq(f2,d1) || subEq(l2,d1)));   // only First/Last exists and matches other DisplayName
 		},
 
 		/**
@@ -1503,28 +1417,12 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			document.getElementById(id).style.visibility='hidden';
 		},
 
-		pruneText: function(text, property) { // this does not remove any real information and keeps letter case
-			if (this.isText(property)) {
-				text = text
-				// remove multiple white space
-					.replace(/[\s]{2,}/g, ' ')
-				// remove leading and trailing whitespace
-					.replace(/^\s+/, "")
-					.replace(/\s+$/, "");
-			}
-			if (this.isPhoneNumber(property)) {
-				text = text.replace(/[^+0-9]/g, ''); // strip non-digits
-				text = text.replace(/^\+/g, 'X').replace(/\+/g, '').replace(/^X/g, '+'); // strip irrelevant '+'
-			}
-			return text;
-		},
-
 		getPrunedProperty: function(card, property) { /* sets are treated as strings here */
 			// filter out ignored fields
 			const defaultValue = this.defaultValue(property);
 			if (this.ignoredFields.includes(property))
 				return defaultValue; // do not use these for comparison
-			var value = this.pruneText(this.getProperty(card, property), property);
+			var value = DuplicateEntriesWindowMatching.pruneText(this.getProperty(card, property), property, this.getNormalizationConfig());
 
 			// Strip any stray email address duplicates from names, which get inserted by some email clients as default names:
 			if (this.isFirstLastDisplayName(property))
@@ -1535,94 +1433,6 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 				value = value.replace(/@googlemail.com$/i, "@gmail.com");
 			// if (value.match(/^UID=[A-Fa-f0-9\-]{36}$/)) { return defaultValue; }
 			return value;
-		},
-
-		abstract: function(text, property) { // this converts from uppercase and loses some information
-			// third step: normalization
-			var p;
-			if (property == 'PhotoURI')
-				return text;
-			if (property.match(/Email$/) && ((p = text.match(/(^[^@]*)(@aol\..*$)/i)))) {
-				text = p[1]+p[2].toLowerCase(); // for AOL, email part before '@' is case-sensitive!
-			} else
-				text = text.toLowerCase();
-			if (this.isText(property))
-			  // transcribe umlauts and ligatures
-				text = text.replace(/[ÄÆäæǼǽ]/g, 'ae')
-					   .replace(/[ÖöŒœ]/g, 'oe')
-					   .replace(/[Üü]/g, 'ue')
-					   .replace(/[ß]/g, 'ss')
-					   .replace(/[Ĳĳ]/g, 'ij');
-
-			// fourth step: simplification
-			if (this.isText(property))
-				text = this.simplifyText(text);
-			if (this.isPhoneNumber(property)) {
-				if (this.natTrunkPrefix != "" && this.countryCallingCode != "" && text.match(this.natTrunkPrefixReqExp))
-					text = this.countryCallingCode+text.substr(this.natTrunkPrefix.length);
-				if (this.intCallPrefix != "" && text.match(this.intCallPrefixReqExp))
-					text = '+'+text.substr(this.intCallPrefix.length);
-				/* if (text.match(/^0([1-9])/)) text = text.substr(1); // strip national prefix
-				strip country codes according to https://en.wikipedia.org/wiki/List_of_country_calling_codes
-				text = text.replace(/^\+1/, '');
-				text = text.replace(/^\+2../, '');
-				text = text.replace(/^\+3[0-469]/, '').replace(/^\+3../, '');
-				text = text.replace(/^\+4[0135-9]/, '').replace(/^\+4../, '');
-				text = text.replace(/^\+5[1-8]/, '').replace(/^\+5../, '');
-				text = text.replace(/^\+6[0-6]/, '').replace(/^\+6../, '');
-				text = text.replace(/^\+7[346-9]/, '').replace(/^\+7/, '');
-				text = text.replace(/^\+8[1-469]/, '').replace(/^\+8../, '');
-				text = text.replace(/^\+9[0-58]/, '').replace(/^\+9../, ''); */
-			}
-			return text;
-		},
-
-		/**
-		 * simplifyText
-		 *
-		 * Strips some characters from a text so that different spellings (e.g. with and
-		 * without accents, can be compared. Works case insensitive.
-		 *
-		 * @param	text		the string to be abstracted
-		 * @return	String		simplified version of the string
-		 */
-		simplifyText : function(text) {
-
-			return text
-			// remove punctuation
-			  .replace(/[\"\'\-_:,;\.\!\?\&\+]+/g, '')
-
-			// replace funny letters
-			  .replace(/[ÂÁÀÃÅâáàãåĀāĂăĄąǺǻ]/g, 'a')
-			  .replace(/[ÊÉÈËèéêëĒēĔĕĖėĘęĚě]/g, 'e')
-			  .replace(/[ÌÍÎÏìíîïĨĩĪīĬĭĮįİı]/g, 'i')
-			  .replace(/[ÕØÒÓÔòóôõøŌōŎŏŐőǾǿ]/g, 'o')
-			  .replace(/[ÙÚÛùúûŨũŪūŬŭŮůŰűŲųơƯư]/g, 'u')
-			  .replace(/[ÝýÿŶŷŸ]/g, 'y')
-
-			  .replace(/[ÇçĆćĈĉĊċČč]/g, 'c')
-			  .replace(/[ÐðĎĐđ]/g, 'd')
-			  .replace(/[ĜĝĞğĠġĢģ]/g, 'g')
-			  .replace(/[ĤĥĦħ]/g, 'h')
-			  .replace(/[Ĵĵ]/g, 'j')
-			  .replace(/[Ķķĸ]/g, 'k')
-			  .replace(/[ĹĺĻļĿŀŁł]/g, 'l')
-			  .replace(/[ÑñŃńŅņŇňŉŊŋ]/g, 'n')
-			  .replace(/[ŔŕŖŗŘř]/g, 'r')
-			  .replace(/[ŚśŜŝŞşŠš]/g, 's')
-			  .replace(/[ŢţŤťŦŧ]/g, 't')
-			  .replace(/[Ŵŵ]/g, 'w')
-			  .replace(/[ŹźŻżŽž]/g, 'z')
-
-			/* would be too aggressive: // remove singleton digits and letters (like initials)
-			  .replace(/ [A-Za-z0-9] /g, ' ') // does not work recursively, just non-overlapping
-			  .replace(/ [A-Za-z0-9] /g, ' ') // needed if there are two consecutive initials!
-			  .replace(/^[A-Za-z0-9] /g, '')
-			  .replace(/ [A-Za-z0-9]$/g, '') */
-
-			// remove any (newly produced) leading or trailing whitespace
-			  .replace(/^\s+/, "")
-			  .replace(/\s+$/, "");
 		},
 
 		createSelectionList: function(cls, labels, values, selected) {
