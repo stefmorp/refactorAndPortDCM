@@ -280,5 +280,9 @@ The card on the right will be preferred for deletion because it contains less in
 
 ## Configuration variables
 
-The options/configuration/preferences used by this Thunderbird extension are are saved in configuration keys starting with `extensions.DuplicateContactsManager.` —
+The options/configuration/preferences used by this Thunderbird extension are saved in configuration keys starting with `extensions.DuplicateContactsManager.` —
 for instance, the list of ignored fields is stored in the variable `ignoreFields`.
+
+## For developers
+
+Module layout, script load order, and change history are documented in [ARCHITECTURE_AND_HISTORY.md](ARCHITECTURE_AND_HISTORY.md).

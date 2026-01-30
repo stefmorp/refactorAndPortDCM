@@ -10,6 +10,7 @@
 	xmlns:html="http://www.w3.org/1999/xhtml"
 	onload="DuplicateEntriesWindow.init()"
 	onunload="DuplicateEntriesWindow.OnUnloadWindow()">
+	<!-- Script load order is required: see ARCHITECTURE_AND_HISTORY.md. -->
 	<script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateEntriesWindowContacts.js"/>
 	<script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateEntriesWindowFields.js"/>
 	<script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateEntriesWindowPrefs.js"/>

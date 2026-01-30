@@ -39,6 +39,34 @@ var DuplicateEntriesWindowUI = (function() {
 	}
 
 	/**
+	 * Creates a XUL menulist (dropdown) with the given labels and values; optional class and selected value.
+	 * Used for address book selection in init() and for PreferMailFormat/boolean fields in the comparison table.
+	 */
+	function createSelectionList(cls, labels, values, selected) {
+		var menulist = document.createElement('menulist');
+		if (cls != null)
+			menulist.setAttribute('class', cls);
+		var menupopup = document.createElement('menupopup');
+		if (cls != null)
+			menupopup.setAttribute('class', cls);
+		for (var i = 0; i < labels.length; i++) {
+			var menuitem = document.createElement('menuitem');
+			menuitem.setAttribute('crop', 'end');
+			if (cls != null)
+				menuitem.setAttribute('class', cls);
+			menuitem.setAttribute('label', labels[i]);
+			menuitem.setAttribute('value', values[i]);
+			if (values[i] == selected) {
+				menuitem.setAttribute('selected', 'true');
+				menupopup.selectedItem = menuitem;
+			}
+			menupopup.appendChild(menuitem);
+		}
+		menulist.appendChild(menupopup);
+		return menulist;
+	}
+
+	/**
 	 * Marks the side specified by 'left' or 'right' as to be kept. If side is null/undefined, toggles from current radio state.
 	 * ctx must have: keepLeftRadioButton, keepRightRadioButton, getString, sideKept, displayedFields.
 	 */
@@ -227,6 +255,7 @@ var DuplicateEntriesWindowUI = (function() {
 		show_hack: show_hack,
 		make_visible: make_visible,
 		make_invisible: make_invisible,
+		createSelectionList: createSelectionList,
 		setContactLeftRight: setContactLeftRight,
 		showReadyState: showReadyState,
 		showSearchingState: showSearchingState,
