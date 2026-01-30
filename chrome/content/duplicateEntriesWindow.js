@@ -162,41 +162,8 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		autoremoveDups: false,
 		preserveFirst: false,
 		nonequivalentProperties : [],
-		addressBookFields: new Array( /* all potentially available fields */
-			'PhotoURI', 'PhotoType', 'PhotoName',
-			'NickName', '__Names'/* matchable */, 'FirstName', 'PhoneticFirstName', 'LastName', 'PhoneticLastName',
-			'SpouseName', 'FamilyName', 'DisplayName', '_PhoneticName', 'PreferDisplayName',
-			'_AimScreenName', '_GoogleTalk', 'CardType', 'Category', 'AllowRemoteContent',
-			'PreferMailFormat', '__MailListNames'/* virtual set */,
-			'__Emails'/* matchable, virtual set */, 'DefaultEmail',
-			'PrimaryEmail', /* 'LowercasePrimaryEmail', */
-			'SecondEmail',  /* 'LowercaseSecondEmail', */
-			'__PhoneNumbers'/* matchable, virtual set */, 'CellularNumber', 'CellularNumberType', 'HomePhone', 'HomePhoneType',
-			'WorkPhone', 'WorkPhoneType', 'FaxNumber', 'FaxNumberType', 'PagerNumber', 'PagerNumberType',
-			'DefaultAddress',
-			'HomeAddress', 'HomeAddress2', 'HomeCity', 'HomeState',	'HomeZipCode', 'HomeCountry',
-			'WorkAddress', 'WorkAddress2', 'WorkCity', 'WorkState', 'WorkZipCode', 'WorkCountry',
-			'JobTitle', 'Department', 'Company',
-			// 'AnniversaryYear', 'AnniversaryMonth', 'AnniversaryDay',
-			'BirthYear', 'BirthMonth', 'BirthDay',
-			'WebPage1', 'WebPage2',
-			'Custom1', 'Custom2', 'Custom3', 'Custom4', 'Notes',
-			'PopularityIndex', 'LastModifiedDate',
-			'UID', 'UUID', 'CardUID',
-			'groupDavKey', 'groupDavVersion', 'groupDavVersionPrev',
-			'RecordKey', 'DbRowID',
-			'unprocessed:rev', 'unprocessed:x-ablabel'),
-		matchablesList : new Array('__Names', '__Emails', '__PhoneNumbers'),
-		metaProperties : new Array('__NonEmptyFields', '__CharWeight'),
-		ignoredFieldsDefault : new Array('PhotoType', 'PhotoName',
-						 'CellularNumberType', 'HomePhoneType', 'WorkPhoneType', 'FaxNumberType', 'PagerNumberType',
-						/* 'LowercasePrimaryEmail', 'LowercaseSecondEmail', */
-						'UID', 'UUID', 'CardUID',
-						'groupDavKey', 'groupDavVersion', 'groupDavVersionPrev',
-						'RecordKey', 'DbRowID',
-						'unprocessed:rev', 'unprocessed:x-ablabel'),
-		ignoredFields : [], // will be derived from ignoredFieldsDefault
-		consideredFields : [], // this.addressBookFields - this.ignoredFields
+		ignoredFields : [],
+		consideredFields : [],
 		natTrunkPrefix : "", // national phone number trunk prefix
 		natTrunkPrefixReqExp : /^0([1-9])/, // typical RegExp for national trunk prefix
 		intCallPrefix : "", // international call prefix
@@ -205,49 +172,6 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 
 		debug: function(str) {
 			console.log(str);
-		},
-
-		isText: function(property) {
-			return property.match(/(Name|GoogleTalk|Address|City|State|Country|Title|Department|Company|WebPage|Custom|Notes)$/) != null && !this.isSelection(property);
-		},
-
-		isFirstLastDisplayName: function(property) {
-			return property.match(/^(FirstName|LastName|DisplayName)$/) != null;
-		},
-
-		isEmail: function(property) {
-			return property.match(/^(PrimaryEmail|SecondEmail)$/) != null;
-		},
-
-		isPhoneNumber: function(property) {
-			return property.match(/^(WorkPhone|HomePhone|FaxNumber|PagerNumber|CellularNumber)$/) != null;
-		},
-
-		isSet: function(property) {
-			return property.match(/^(__MailListNames|__Emails|__PhoneNumbers)$/) != null;
-		},
-
-		isSelection: function(property) {
-			return property.match(/^(PreferMailFormat|PreferDisplayName|AllowRemoteContent)$/) != null;
-		},
-
-		isNumerical: function(property) {
-			return property.match(/^(PopularityIndex|LastModifiedDate|RecordKey|DbRowID)$/) != null;
-		},
-
-		defaultValue: function(property) { /* sets are treated as strings here */
-			if (this.isSelection(property) || this.isNumerical(property))
-				return (/* property == 'PreferDisplayName' ? "1" : */ "0");
-			else
-				return this.isSet(property) ? "{}" : "";
-		},
-
-		charWeight: function(str, property) {
-			// gives preference to values with many non-digit/uppercase and special characters
-			const pat = this.isPhoneNumber(property) ? /[ 0-9]/g : /[ a-z]/g; /* umlauts have higher weight than their transcription */
-			const result = str.replace(pat, '').length;
-			// this.debug("isPhoneNumber("+property+") = "+this.isPhoneNumber(property)+" charWeight("+str+") = "+result);
-			return result;
 		},
 
 		/** Returns config object for DuplicateEntriesWindowMatching (normalization). */
@@ -267,6 +191,21 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		 * Will be called by duplicateEntriesWindow.xul once the according window is loaded
 		 */
 		init: function() {
+			var F = DuplicateEntriesWindowFields;
+			this.addressBookFields = F.addressBookFields;
+			this.matchablesList = F.matchablesList;
+			this.metaProperties = F.metaProperties;
+			this.ignoredFieldsDefault = F.ignoredFieldsDefault;
+			this.isText = F.isText;
+			this.isFirstLastDisplayName = F.isFirstLastDisplayName;
+			this.isEmail = F.isEmail;
+			this.isPhoneNumber = F.isPhoneNumber;
+			this.isSet = F.isSet;
+			this.isSelection = F.isSelection;
+			this.isNumerical = F.isNumerical;
+			this.defaultValue = F.defaultValue;
+			this.charWeight = F.charWeight;
+
 			this.abManager = DuplicateEntriesWindowContacts.getAbManager();
 			do {
 				var Prefs = Components.classes["@mozilla.org/preferences-service;1"]
@@ -284,7 +223,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 				try { this.intCallPrefix  = this.prefsBranch.getCharPref('intCallPrefix');
 				      this.intCallPrefixReqExp = new RegExp("^"+this.intCallPrefix+"([1-9])"); } catch(e) {}
 				try { this.countryCallingCode = this.prefsBranch.getCharPref('countryCallingCode'); } catch(e) {}
-				this.ignoredFields = this.ignoredFieldsDefault;
+				this.ignoredFields = this.ignoredFieldsDefault.slice();
 				try { var prefStringValue = this.prefsBranch.getCharPref('ignoreFields');
 				      if (prefStringValue.length > 0)
 					      this.ignoredFields = prefStringValue.split(/\s*,\s*/);
