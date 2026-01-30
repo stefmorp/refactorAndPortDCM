@@ -650,83 +650,17 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			this.restart = true;
 		},
 
-		getProperty: function(card, property) { /* sets are treated as strings here */
-			const defaultValue = this.defaultValue(property);
-			const value = card.getProperty(property, defaultValue);
-			if (this.isSelection(property) && value == "")
-				return defaultValue; // recover from wrongly empty field
-			if (this.isSet(property)) /* used for '__MailListNames' */
-				return value.toString();
-			if (property == 'LastModifiedDate')
-				 return value == "0" ? "" : new Date(value * 1000).toLocaleString();
-			if (property == 'PhotoURI' && value == 'chrome://messenger/skin/addressbook/icons/contact-generic.png')
-				return defaultValue;
-				/* since actual image will be loaded asynchronouslyno need to do the loading here:
-				var contents = this.readFile(value, false, false);
-				return contents ? contents : defaultValue;
-				*/
-			return value+""; // force string even when isSelection or isNumerical
+		getProperty: function(card, property) {
+			return DuplicateEntriesWindowCardValues.getProperty(this, card, property);
 		},
-
 		getTransformedProperty: function(card, property) {
-			var value = this.getPrunedProperty(card, property);
-			var M = DuplicateEntriesWindowMatching;
-			if (this.isFirstLastDisplayName(property)) {
-				var p, fn, ln;
-				if (property == 'DisplayName') {
-					if ((p = value.match(/^([^,]+),\s+(.+)$/))) {
-						[fn, ln] = M.transformMiddlePrefixName(p[2], p[1]);
-						value = fn + " " + ln;
-					}
-					return value;
-				}
-				fn = this.getPrunedProperty(card, 'FirstName');
-				ln = this.getPrunedProperty(card,  'LastName');
-				if (/,\s*$/.test(fn)) {
-					ln = fn.replace(/,\s*$/,"");
-					fn = this.getProperty(card, 'LastName');
-				} else {
-					if ((p = fn.match(/^([^,]+),\s+(.+)$/))) {
-						fn = p[2]+(ln != "" ? " "+ln : "");
-						ln = p[1];
-					}
-				}
-				[fn, ln] = M.transformMiddlePrefixName(fn, ln);
-				return (property == 'FirstName' ? fn : ln);
-			}
-			return value;
+			return DuplicateEntriesWindowCardValues.getTransformedProperty(this, card, property);
 		},
-
 		getAbstractedTransformedProperty: function(card, property) {
-			return DuplicateEntriesWindowMatching.abstract(this.getTransformedProperty(card, property), property, this.getNormalizationConfig());
+			return DuplicateEntriesWindowCardValues.getAbstractedTransformedProperty(this, card, property);
 		},
-
-		/**
-		 * This is a simplified representation of a card from the address book with
-		 * only those fields which are required for comparison,
-		 * some pre-processing already performed on the necessary fields.
-		 */
 		getSimplifiedCard: function(book, i) {
-			if (!this.vcardsSimplified[book][i] && this.vcards[book][i]) {
-				var card = this.vcards[book][i].QueryInterface(Components.interfaces.nsIAbCard);
-				var vcard = new Object();
-				[vcard['FirstName'], vcard['LastName'], vcard['DisplayName']] =
-					this.completeFirstLastDisplayName(
-						[this.getAbstractedTransformedProperty(card,   'FirstName'),
-						 this.getAbstractedTransformedProperty(card,    'LastName'),
-						 this.getAbstractedTransformedProperty(card, 'DisplayName')],
-						card);
-				vcard['_AimScreenName'] = this.getAbstractedTransformedProperty(card,'_AimScreenName');
-				vcard[  'PrimaryEmail'] = this.getAbstractedTransformedProperty(card,  'PrimaryEmail');
-				vcard[   'SecondEmail'] = this.getAbstractedTransformedProperty(card,   'SecondEmail');
-				// not using HomePhone for matching because often it is shared by several people
-				vcard['Phone1'] = this.getAbstractedTransformedProperty(card, 'CellularNumber');
-				vcard['Phone2'] = this.getAbstractedTransformedProperty(card, 'PagerNumber');
-				vcard['Phone3'] = this.getAbstractedTransformedProperty(card, 'WorkPhone');
-				// not using FaxNumber for matching because often it is shared by several people
-				this.vcardsSimplified[book][i] = vcard;
-			}
-			return this.vcardsSimplified[book][i];
+			return DuplicateEntriesWindowCardValues.getSimplifiedCard(this, book, i);
 		},
 
 		/**
@@ -988,38 +922,8 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			}
 		},
 
-		/**
-		 * Complete FirstName, LastName, and DisplayName if needed (and easily possible)
-		 * from each other, else from PrimaryEmail or SecondEmail of card
-		 */
-		completeFirstLastDisplayName: function([fn, ln, dn], card) {
-			if (dn == "" && fn != "" && ln != "")
-				dn = fn+" "+ln;
-			else if (fn == "" || ln == "" || dn == "") {
-				function getFirstLastFromEmail(email) {
-					var p = email.match(/^\s*([A-Za-z0-9\x80-\uFFFF]+)[\.\-_]+([A-Za-z0-9\x80-\uFFFF]+)@/);
-					if (p && p[1] == "no" /* && p[2] == "reply"*/)
-						p = undefined;
-					if (!p) // second attempt works because email has not been converted to lower-case:
-						p = email.match(/^\s*([A-Z][a-z0-9_\x80-\uFFFF]*)([A-Z][a-z0-9_\x80-\uFFFF]*)@/);
-					return p;
-				}
-				var p = dn.match(/^\s*([A-Za-z0-9_\x80-\uFFFF]+)\s+([A-Za-z0-9_\x80-\uFFFF]+)\s*$/);
-				if(!p)
-					p = getFirstLastFromEmail(this.getPrunedProperty(card,'PrimaryEmail'));
-				if(!p)
-					p = getFirstLastFromEmail(this.getPrunedProperty(card, 'SecondEmail'));
-				if (p) {
-					var cfg = this.getNormalizationConfig();
-					if (fn == "")
-						fn = DuplicateEntriesWindowMatching.abstract(p[1].replace(/[0-9]/g, ''), 'FirstName', cfg);
-					if (ln == "")
-						ln = DuplicateEntriesWindowMatching.abstract(p[2].replace(/[0-9]/g, ''), 'LastName', cfg);
-					if (dn == "")
-						dn = fn+" "+ln;
-				}
-			}
-			return [fn, ln, dn];
+		completeFirstLastDisplayName: function(nameArray, card) {
+			return DuplicateEntriesWindowCardValues.completeFirstLastDisplayName(this, nameArray, card);
 		},
 
 		/**
@@ -1053,8 +957,8 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 				}
 			}
 			card.setProperty('__MailListNames', mailListNames);
-			card.setProperty('__Emails', this.propertySet(card, ['PrimaryEmail', 'SecondEmail']));
-			card.setProperty('__PhoneNumbers', this.propertySet(card, ['HomePhone', 'WorkPhone',
+			card.setProperty('__Emails', DuplicateEntriesWindowCardValues.propertySet(this, card, ['PrimaryEmail', 'SecondEmail']));
+			card.setProperty('__PhoneNumbers', DuplicateEntriesWindowCardValues.propertySet(this, card, ['HomePhone', 'WorkPhone',
 				'FaxNumber', 'PagerNumber', 'CellularNumber']));
 		},
 
@@ -1136,14 +1040,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		},
 
 		propertySet: function(card, properties) {
-			var result = new Set();
-			for(let property of properties) { /* property is assumed not itself a set */
-				const defaultValue = this.defaultValue(property);
-				const value = this.getAbstractedTransformedProperty(card, property);
-				if (value != defaultValue)
-					result.add(value);
-			}
-			return result;
+			return DuplicateEntriesWindowCardValues.propertySet(this, card, properties);
 		},
 
 /*
@@ -1205,22 +1102,8 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			document.getElementById(id).style.visibility='hidden';
 		},
 
-		getPrunedProperty: function(card, property) { /* sets are treated as strings here */
-			// filter out ignored fields
-			const defaultValue = this.defaultValue(property);
-			if (this.ignoredFields.includes(property))
-				return defaultValue; // do not use these for comparison
-			var value = DuplicateEntriesWindowMatching.pruneText(this.getProperty(card, property), property, this.getNormalizationConfig());
-
-			// Strip any stray email address duplicates from names, which get inserted by some email clients as default names:
-			if (this.isFirstLastDisplayName(property))
-				if (value == this.getPrunedProperty(card, 'PrimaryEmail') ||
-				    value == this.getPrunedProperty(card,  'SecondEmail'))
-					return defaultValue;
-			if (this.isEmail(property))
-				value = value.replace(/@googlemail.com$/i, "@gmail.com");
-			// if (value.match(/^UID=[A-Fa-f0-9\-]{36}$/)) { return defaultValue; }
-			return value;
+		getPrunedProperty: function(card, property) {
+			return DuplicateEntriesWindowCardValues.getPrunedProperty(this, card, property);
 		},
 
 		createSelectionList: function(cls, labels, values, selected) {
