@@ -685,7 +685,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 					// OK, we found something that looks like a duplicate or cannot match anything.
 					var card1 = this.vcards[this.BOOK_1][this.position1];
 					var card2 = this.vcards[this.BOOK_2][this.position2];
-					var [comparison, preference] = this.abCardsCompare(card1, card2);
+					var [comparison, preference] = DuplicateEntriesWindowComparison.compareCards(card1, card2, this);
 					if (comparison != -2 && this.autoremoveDups &&
 					    !(this.abDir1 != this.abDir2 && this.preserveFirst && preference < 0)) {
 						if (preference < 0)
@@ -1244,18 +1244,6 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			return result;
 		},
 
-		propertyUnion: function(c1, c2) {
-			var union = new Array();
-			for(let i = 0; i < 2; i++) {
-				var it = i == 0 ? c1.properties : c2.properties;
-				while (it.hasMoreElements()) {
-					const property = it.getNext().QueryInterface(Components.interfaces.nsIProperty).name;
-					pushIfNew(property, union);
-				}
-			}
-			return union;
-		},
-
 /*
 		readFile: function(url, async, binary) {
 			if (url) {
@@ -1282,111 +1270,9 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		},
 */
 
-		/**
-		 * @param	Array		Address book card 1
-		 * @param	Array		Address book card 2
-		 * @return [comparison, preference] where
-		 *          comparison = 1 if second card has less information
-		 *          comparison = 0 if cards are equivalent
-		 *          comparison =-1 if first card has less information
-		 *          comparison =-2 if cards are incomparable
-		 *          preference > 0 if first card has more information
-		 *                            or else has more non-empty fields
-		 *                            or else has higher char weight
-		 *                            or else has higher PopularityIndex
-		 *                            or else has higher LastModifiedDate (if present in both)
-		 *                            than second one
-		 *          preference < 0 if second card ... than first one
-		 *          preference = 0 otherwise (that is, cards are equivalent or incomparable
-		 *                                    with same number of non-empty fields, char weight,
-		 *                                    PopularityIndex, and LastModifiedDate)
-		 */
+		/** Delegates to DuplicateEntriesWindowComparison.compareCards; context is this (window). */
 		abCardsCompare: function(c1, c2) {
-			var nDiffs = 0; // unused
-			var c1_less_complete = true;
-			var c2_less_complete = true;
-			var props = this.propertyUnion(c1, c2);
-			for(let i = 0; i < props.length; i++) {
-				var property = props[i];
-				if (!this.consideredFields.includes(property) || /* do not compare ignored fields */
-				    this.isNumerical(property) || /* ignore PopularityIndex, LastModifiedDate and other integers */
-				    this.metaProperties.includes(property) || /* ignore meta properties */
-				    this.isEmail(property) || this.isPhoneNumber(property)) // virtual set property is compared instead
-					continue;
-				const defaultValue = this.isSet(property) ? new Set() : this.defaultValue(property);
-				let value1, value2;
-				if (this.isSet(property)) {
-					value1 = c1.getProperty(property, defaultValue);
-					value2 = c2.getProperty(property, defaultValue);
-				} else {
-					value1 = this.getAbstractedTransformedProperty(c1, property);
-					value2 = this.getAbstractedTransformedProperty(c2, property);
-				}
-				if (value1 != value2) { // values not equivalent
-					var diffProp = property == '__MailListNames' ? "(MailingListMembership)" :
-					               property == '__Emails' ? "{PrimaryEmail,SecondEmail}" :
-					               property == '__PhoneNumbers' ? "{CellularNumber,HomePhone,WorkPhone,FaxNumber,PagerNumber}" :
-					               property;
-					pushIfNew(diffProp, this.nonequivalentProperties);
-					nDiffs++; // unused
-
-					// this.debug("abCardsCompare: "+property+" = "+value1+" vs. "+value2);
-					if (!c1_less_complete && !c2_less_complete)
-						continue; // already clear that cards are incomparable
-
-					// TODO combine these comparisons with those in displayCardField
-					if (this.isText(property)) {
-						if (!value2.includes(value1)) // value1 is substring of value2
-							c1_less_complete = false;
-						if (!value1.includes(value2)) // value2 is substring of value1
-							c2_less_complete = false;
-					} else if (this.isSet(property)) { /* used for __MailListNames */
-						// this.debug("abCardsCompare: "+property+": "+value1.toString()+" vs. "+value2.toString()+": "+value1.isSuperset(value2)+" "+value2.isSuperset(value1));
-						if (!value2.isSuperset(value1))
-							c1_less_complete = false;
-						if (!value1.isSuperset(value2))
-							c2_less_complete = false;
-					} else {
-						if (value1 != defaultValue)
-							c1_less_complete = false;
-						if (value2 != defaultValue)
-							c2_less_complete = false;
-					}
-				}
-			}
-			/*
-			const debug_msg = "abCardsCompare: "+
-			      "less_complete = " +c1_less_complete                     +" vs. "+c2_less_complete+
-                            ", nonemptyFields = "+c1.getProperty('__NonEmptyFields', 0)+" vs. "+c2.getProperty('__NonEmptyFields', 0)+
-			    ", charWeight = "    +c1.getProperty('__CharWeight', 0)    +" vs. "+c2.getProperty('__CharWeight', 0);
-			this.debug(debug_msg);
-			*/
-			if (c1_less_complete != c2_less_complete) {
-				comparison = preference = c1_less_complete ? -1 : 1;
-			} else {
-				comparison = c1_less_complete ? 0/* equivalent */ : -2/* incomparable */;
-				/*
-				 * in case of equivalence and also if incomparable
-				 * determine some preference for deletion for one card of matching pairs,
-				 * using those non-ignored properties satisfying this.isNumerical()
-				 */
-				var preference = c1.getProperty('__NonEmptyFields', 0) -
-				                 c2.getProperty('__NonEmptyFields', 0);
-				if (preference == 0)
-					preference = c1.getProperty('__CharWeight', 0) -
-					             c2.getProperty('__CharWeight', 0);
-				if (preference == 0)
-					preference = c1.getProperty('PopularityIndex' , 0) -
-					             c2.getProperty('PopularityIndex' , 0);
-				if (preference == 0) {
-					const date1 = c1.getProperty('LastModifiedDate', 0);
-					const date2 = c2.getProperty('LastModifiedDate', 0);
-					if (date1 != 0 && date2 != 0)
-						preference = date1 - date2;
-				}
-			}
-			// this.debug("abCardsCompare: comparison = "+comparison+" preference = "+preference+" for "+this.getProperty(c1, 'DisplayName')+" vs. "+this.getProperty(c2, 'DisplayName'));
-			return [comparison, preference];
+			return DuplicateEntriesWindowComparison.compareCards(c1, c2, this);
 		},
 
 		enable: function(id) {

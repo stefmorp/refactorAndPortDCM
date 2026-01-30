@@ -12,6 +12,7 @@
 	onunload="DuplicateEntriesWindow.OnUnloadWindow()">
 	<script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateEntriesWindowContacts.js"/>
 	<script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateEntriesWindowMatching.js"/>
+	<script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateEntriesWindowComparison.js"/>
 	<script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateEntriesWindow.js"/>
 	<stringbundleset id="duplicateContactsManagerStringbundleset">
 		<stringbundle id="bundle_duplicateContactsManager" src="chrome://duplicatecontactsmanager/locale/duplicateContactsManager.properties" />
