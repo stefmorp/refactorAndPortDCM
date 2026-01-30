@@ -207,39 +207,9 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			this.charWeight = F.charWeight;
 
 			this.abManager = DuplicateEntriesWindowContacts.getAbManager();
-			do {
-				var Prefs = Components.classes["@mozilla.org/preferences-service;1"]
-					.getService(Components.interfaces.nsIPrefService);
-				var prefBranchPrefixId = "extensions.DuplicateContactsManager.";
-				this.prefsBranch = Prefs.getBranch(prefBranchPrefixId);
-				if (!this.prefsBranch)
-					break;
-				try { this.autoremoveDups = this.prefsBranch.getBoolPref('autoremoveDups'); } catch(e) {}
-				try { this.preserveFirst = this.prefsBranch.getBoolPref('preserveFirst'); } catch(e) {}
-				try { this.deferInteractive = this.prefsBranch.getBoolPref('deferInteractive'); } catch(e) {}
-
-				try { this.natTrunkPrefix  = this.prefsBranch.getCharPref('natTrunkPrefix');
-				      this.natTrunkPrefixReqExp = new RegExp("^"+this.natTrunkPrefix+"([1-9])"); } catch(e) {}
-				try { this.intCallPrefix  = this.prefsBranch.getCharPref('intCallPrefix');
-				      this.intCallPrefixReqExp = new RegExp("^"+this.intCallPrefix+"([1-9])"); } catch(e) {}
-				try { this.countryCallingCode = this.prefsBranch.getCharPref('countryCallingCode'); } catch(e) {}
-				this.ignoredFields = this.ignoredFieldsDefault.slice();
-				try { var prefStringValue = this.prefsBranch.getCharPref('ignoreFields');
-				      if (prefStringValue.length > 0)
-					      this.ignoredFields = prefStringValue.split(/\s*,\s*/);
-				    } catch(e) {}
-			} while (0);
-			document.getElementById('autoremove').checked = this.autoremoveDups;
-			document.getElementById('preservefirst').checked = this.preserveFirst;
-			document.getElementById('deferInteractive').checked = this.deferInteractive;
-			document.getElementById('natTrunkPrefix').value = this.natTrunkPrefix;
-			document.getElementById('intCallPrefix').value = this.intCallPrefix;
-			document.getElementById('countryCallingCode').value = this.countryCallingCode;
-			this.consideredFields = /* value before any interactive changes by user */
-				this.addressBookFields.filter(x => !this.ignoredFields.includes(x));
-			document.getElementById('consideredFields').textContent = this.consideredFields.
-				filter(x => !this.isSet(x) && !this.matchablesList.includes(x)).join(", ");
-			document.getElementById('ignoredFields').value = this.ignoredFields.join(", ");
+			this.prefsBranch = DuplicateEntriesWindowPrefs.getPrefsBranch();
+			DuplicateEntriesWindowPrefs.loadPrefs(this);
+			DuplicateEntriesWindowPrefs.applyPrefsToDOM(this);
 
 			try { /* for Thunderbird 68+. */
 				var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
@@ -334,31 +304,14 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			//It seems that Thunderbird 11 on Max OS 10.7 can actually be write fields, although an exception is thrown.
 			this.readAddressBooks();
 
-			this.autoremoveDups = document.getElementById('autoremove').getAttribute('checked');
-			this.preserveFirst = document.getElementById('preservefirst').getAttribute('checked');
-			this.deferInteractive = document.getElementById('deferInteractive').getAttribute('checked');
-			this.natTrunkPrefix = document.getElementById('natTrunkPrefix').value;
-			this.intCallPrefix = document.getElementById('intCallPrefix').value;
-			this.countryCallingCode = document.getElementById('countryCallingCode').value;
+			DuplicateEntriesWindowPrefs.readPrefsFromDOM(this);
 			if (this.natTrunkPrefix != "" && !this.natTrunkPrefix.match(/^[0-9]{1,2}$/))
 				alert("National phone number trunk prefix '"+this.natTrunkPrefix+"' should contain one or two digits");
 			if (this.intCallPrefix != "" && !this.intCallPrefix.match(/^[0-9]{2,4}$/))
 				alert("International call prefix '"+this.intCallPrefix+"' should contain two to four digits");
 			if (this.countryCallingCode != "" && !this.countryCallingCode.match(/^(\+|[0-9])[0-9]{1,6}$/))
 				alert("Default country calling code '"+this.countryCallingCode+"' should contain a leading '+' or digit followed by one to six digits");
-			this.ignoredFields = document.getElementById('ignoredFields').value.split(/\s*,\s*/);
-			this.consideredFields = this.addressBookFields./*
-				concat(this.ignoredFieldsDefault).
-				filter(x => !this.matchablesList.includes(x)). */
-				filter(x => !this.ignoredFields.includes(x));
-
-			this.prefsBranch.setBoolPref('autoremoveDups', this.autoremoveDups);
-			this.prefsBranch.setBoolPref('preserveFirst', this.preserveFirst);
-			this.prefsBranch.setBoolPref('deferInteractive', this.deferInteractive);
-			this.prefsBranch.setCharPref('natTrunkPrefix', this.natTrunkPrefix);
-			this.prefsBranch.setCharPref('intCallPrefix', this.intCallPrefix);
-			this.prefsBranch.setCharPref('countryCallingCode', this.countryCallingCode);
-			this.prefsBranch.setCharPref('ignoreFields', this.ignoredFields.join(", "));
+			DuplicateEntriesWindowPrefs.savePrefs(this);
 
 			this.purgeAttributesTable();
 			DuplicateEntriesWindowUI.showSearchingState(this);
@@ -406,7 +359,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			}
 			this.updateProgress();
 			// starting the search via setTimeout allows redrawing the progress info
-			setTimeout(function() { DuplicateEntriesWindow.searchDuplicateIntervalAction(); }, 13);
+			setTimeout(function() { DuplicateEntriesWindowSearch.runIntervalAction(DuplicateEntriesWindow); }, 13);
 		},
 
 		/**
@@ -483,170 +436,27 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			this.vcards[book][index] = null; // set empty element, but leave element number as is
 		},
 
-		updateDeletedInfo: function (label, book, nDeleted) {
-			const cards = this.getString('cards');
-			document.getElementById(label).value = '('+cards+': '+ (this.vcards[book].length -
-			                         (this.abDir1 == this.abDir2 ? this.totalCardsDeleted1 +
-			                                                       this.totalCardsDeleted2 : nDeleted)) +')';
+		updateDeletedInfo: function(label, book, nDeleted) {
+			DuplicateEntriesWindowUI.updateDeletedInfo(this, label, book, nDeleted);
 		},
 
 		updateProgress: function() {
-			// update status info - will not be visible immediately during search, see also http://forums.mozillazine.org/viewtopic.php?p=5300605
-			var current, pos, max;
-			if(!this.deferInteractive || !this.nowHandling) {
-				current = 'pair';
-				pos = this.positionSearch + 1;
-				const num1 = this.vcards[this.BOOK_1].length;
-				const num2 = this.vcards[this.BOOK_2].length;
-				max = this.abDir1 == this.abDir2 ? (num1*(num1-1)/2) : (num1*num2);
-				if (pos > max) /* happens at end */
-					pos = max;
-			} else {
-				current = 'parity';
-				pos = this.positionDuplicates;
-				max = this.duplicates.length;
-			}
-			this.progressmeter.setAttribute('value', ((max == 0 ? 1 : pos/max) * 100) + '%');
-			this.progresstext.value = this.getString(current)+" "+pos+
-				" "+this.getString('of')+" "+max;
-			this.updateDeletedInfo('statusAddressBook1_size' , this.BOOK_1, this.totalCardsDeleted1);
-			this.updateDeletedInfo('statusAddressBook2_size' , this.BOOK_2, this.totalCardsDeleted2);
+			DuplicateEntriesWindowUI.updateProgress(this);
 		},
 
-		/**
-		 * advances internal pointers to next available card pair.
-		 * Returns true if and only if next pair is available
-		 */
 		skipPositionsToNext: function() {
-			if(!this.deferInteractive || !this.nowHandling) {
-				if (this.searchPositionsToNext())
-					return true;
-				if (!this.deferInteractive)
-					return false;
-				this.nowHandling = true;
-			}
-			do {
-				if (this.positionDuplicates++ >= this.duplicates.length) {
-				  return false;
-				}
-				[this.position1, this.position2] = this.duplicates[this.positionDuplicates-1];
-			} while(!this.vcards[this.BOOK_1][this.position1] ||
-			        !this.vcards[this.BOOK_2][this.position2]);
-			this.updateProgress();
-			return true;
+			return DuplicateEntriesWindowSearch.skipPositionsToNext(this);
 		},
 
-		/**
-		 * increments internal pointers to next available card pair.
-		 * Returns true if and only if next pair is available
-		 */
 		searchPositionsToNext: function() {
-			// If the current position is deleted, force the search for a next one by
-			// setting the position2 to the end.
-			if(!this.vcards[this.BOOK_1][this.position1])
-				this.position2 = this.vcards[this.BOOK_2].length;
-
-			this.positionSearch++;
-			// Search for the next position2
-			do
-			{
-				++(this.position2);
-				if(this.position2 >= this.vcards[this.BOOK_2].length)
-				{
-					// We have reached the end, search for the next position
-					do
-					{
-						this.position1++;
-						this.updateProgress();
-						// if same book, make sure it's possible to have ...,position1, position2.
-						if(this.position1 + (this.abDir1 == this.abDir2 ? 1 : 0) >= this.vcards[this.BOOK_1].length)
-							return false;
-					} while(!this.vcards[this.BOOK_1][this.position1]);
-
-					// if same book, we start searching the pair with the position after.
-					this.position2 = (this.abDir1 == this.abDir2 ? this.position1 + 1 : 0);
-				}
-			} while(!this.vcards[this.BOOK_2][this.position2]);
-
-			return true;
-		},
-
-		/**
-		 * performs the actual search action. Should not be called directly, but by searchNextDuplicate().
-		 */
-		searchDuplicateIntervalAction: function() {
-			var lasttime = new Date;
-			while (this.skipPositionsToNext()) {
-				if ((new Date)-lasttime >= 1000) {
-					// Force/enable Thunderbird every 1000 milliseconds to redraw the progress bar etc.
-					// See also http://stackoverflow.com/questions/2592335/how-to-report-progress-of-a-javascript-function
-					// As a nice side effect, this allows the stop button to take effect while this main loop is active!
-					setTimeout(function() { DuplicateEntriesWindow.searchDuplicateIntervalAction(); }, 13);
-					return;
-				}
-
-				var simplified_card1 = this.getSimplifiedCard(this.BOOK_1, this.position1);
-				var simplified_card2 = this.getSimplifiedCard(this.BOOK_2, this.position2);
-				if (simplified_card1['_AimScreenName'] != simplified_card2['_AimScreenName'])
-					continue; // useful for manual differentiation to prevent repeated treatment
-				var M = DuplicateEntriesWindowMatching;
-				var namesmatch = M.namesMatch(simplified_card1, simplified_card2);
-				var mailsmatch = M.mailsMatch(simplified_card1, simplified_card2);
-				var phonesmatch = M.phonesMatch(simplified_card1, simplified_card2);
-				var nomailsphonesmatch = M.noMailsPhonesMatch(simplified_card1) &&
-				                        M.noMailsPhonesMatch(simplified_card2);
-				var nomatch = M.noNamesMatch(simplified_card1) &&
-				              M.noNamesMatch(simplified_card2) && nomailsphonesmatch;  // pathological case
-				if (namesmatch || mailsmatch || phonesmatch || nomatch) {
-					// OK, we found something that looks like a duplicate or cannot match anything.
-					var card1 = this.vcards[this.BOOK_1][this.position1];
-					var card2 = this.vcards[this.BOOK_2][this.position2];
-					var [comparison, preference] = DuplicateEntriesWindowComparison.compareCards(card1, card2, this);
-					if (comparison != -2 && this.autoremoveDups &&
-					    !(this.abDir1 != this.abDir2 && this.preserveFirst && preference < 0)) {
-						if (preference < 0)
-							this.deleteAbCard(this.abDir1, this.BOOK_1, this.position1, true);
-						else // if preference >= 0, prefer to delete c2
-							this.deleteAbCard(this.abDir2, this.BOOK_2, this.position2, true);
-					} else {
-						//window.clearInterval(this.searchInterval);
-
-						if (this.deferInteractive && !this.nowHandling) { // append the positions to queue
-							this.duplicates.push([this.position1, this.position2]);
-						}
-						else {
-							DuplicateEntriesWindowUI.showDuplicatePairState(this);
-							this.statustext.className = 'with-progress';
-							this.statustext.textContent = this.getString(
-							                        nomatch ? 'noMatch' : 'matchFound');
-							this.displayCardData(card1, card2, comparison, preference,
-							                     namesmatch, mailsmatch, phonesmatch);
-							return;
-						}
-					}
-				}
-			}
-			this.endSearch();
+			return DuplicateEntriesWindowSearch.searchPositionsToNext(this);
 		},
 
 		endSearch: function() {
 			DuplicateEntriesWindowUI.showFinishedState(this);
 			this.statustext.className = 'with-progress';
 			this.statustext.textContent = this.getString('finished');
-
-			// show statistics
-			var totalCardsDeleted = this.totalCardsDeleted1+this.totalCardsDeleted2;
-			document.getElementById('resultNumBefore').value = this.totalCardsBefore;
-			document.getElementById('resultNumAfter').value = this.totalCardsBefore - totalCardsDeleted;
-			document.getElementById('resultNumRemovedMan').value = totalCardsDeleted - this.totalCardsDeletedAuto;
-			document.getElementById('resultNumRemovedAuto').value = this.totalCardsDeletedAuto;
-			document.getElementById('resultNumChanged').value = this.totalCardsChanged;
-			document.getElementById('resultNumSkipped').value = this.totalCardsSkipped;
-			document.getElementById('resultConsideredFields').textContent = this.consideredFields.
-				filter(x => !this.isSet(x) && !this.matchablesList.includes(x)).join(", ");
-			document.getElementById('resultIgnoredFields').textContent = this.ignoredFields.join(", ");
-			document.getElementById('resultDiffProps').textContent = this.nonequivalentProperties.join(", ");
-			document.getElementById('startbutton').setAttribute('label', this.getString('Restart'));
+			DuplicateEntriesWindowUI.showFinishedStats(this);
 			this.restart = true;
 		},
 
@@ -678,39 +488,10 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		},
 
 		/**
-		 * Enriches a card with virtual properties used for comparison (__NonEmptyFields,
-		 * __CharWeight, __MailListNames, __Emails, __PhoneNumbers). Called by
-		 * DuplicateEntriesWindowContacts.getAllAbCards for each card.
+		 * Enriches a card with virtual properties used for comparison. Delegates to DuplicateEntriesWindowCardValues.
 		 */
 		enrichCardForComparison: function(card, mailLists) {
-			var nonemptyFields = 0;
-			var charWeight = 0;
-			for (var index = 0; index < this.consideredFields.length; index++) {
-				var property = this.consideredFields[index];
-				if (this.isNumerical(property))
-					continue;
-				var defaultValue = this.defaultValue(property);
-				var value = card.getProperty(property, defaultValue);
-				if (value != defaultValue)
-					nonemptyFields += 1;
-				if (this.isText(property) || this.isEmail(property) || this.isPhoneNumber(property))
-					charWeight += this.charWeight(value, property);
-			}
-			card.setProperty('__NonEmptyFields', nonemptyFields);
-			card.setProperty('__CharWeight', charWeight);
-
-			var mailListNames = new Set();
-			var email = card.primaryEmail;
-			if (email) {
-				for (var i = 0; i < mailLists.length; i++) {
-					if (mailLists[i][1].includes(email))
-						mailListNames.add(mailLists[i][0]);
-				}
-			}
-			card.setProperty('__MailListNames', mailListNames);
-			card.setProperty('__Emails', DuplicateEntriesWindowCardValues.propertySet(this, card, ['PrimaryEmail', 'SecondEmail']));
-			card.setProperty('__PhoneNumbers', DuplicateEntriesWindowCardValues.propertySet(this, card, ['HomePhone', 'WorkPhone',
-				'FaxNumber', 'PagerNumber', 'CellularNumber']));
+			DuplicateEntriesWindowCardValues.enrichCardForComparison(this, card, mailLists);
 		},
 
 		readAddressBooks: function() {

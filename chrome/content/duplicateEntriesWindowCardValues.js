@@ -142,6 +142,43 @@ var DuplicateEntriesWindowCardValues = (function() {
 		return result;
 	}
 
+	/**
+	 * Enriches a card with virtual properties used for comparison (__NonEmptyFields,
+	 * __CharWeight, __MailListNames, __Emails, __PhoneNumbers). Called by
+	 * DuplicateEntriesWindowContacts.getAllAbCards for each card.
+	 * ctx must have: consideredFields, isNumerical, defaultValue, isText, isEmail, isPhoneNumber, charWeight.
+	 */
+	function enrichCardForComparison(ctx, card, mailLists) {
+		var nonemptyFields = 0;
+		var charWeight = 0;
+		for (var index = 0; index < ctx.consideredFields.length; index++) {
+			var property = ctx.consideredFields[index];
+			if (ctx.isNumerical(property))
+				continue;
+			var defaultValue = ctx.defaultValue(property);
+			var value = card.getProperty(property, defaultValue);
+			if (value != defaultValue)
+				nonemptyFields += 1;
+			if (ctx.isText(property) || ctx.isEmail(property) || ctx.isPhoneNumber(property))
+				charWeight += ctx.charWeight(value, property);
+		}
+		card.setProperty('__NonEmptyFields', nonemptyFields);
+		card.setProperty('__CharWeight', charWeight);
+
+		var mailListNames = new Set();
+		var email = card.primaryEmail;
+		if (email) {
+			for (var i = 0; i < mailLists.length; i++) {
+				if (mailLists[i][1].includes(email))
+					mailListNames.add(mailLists[i][0]);
+			}
+		}
+		card.setProperty('__MailListNames', mailListNames);
+		card.setProperty('__Emails', propertySet(ctx, card, ['PrimaryEmail', 'SecondEmail']));
+		card.setProperty('__PhoneNumbers', propertySet(ctx, card, ['HomePhone', 'WorkPhone',
+			'FaxNumber', 'PagerNumber', 'CellularNumber']));
+	}
+
 	return {
 		getProperty: getProperty,
 		getPrunedProperty: getPrunedProperty,
@@ -149,6 +186,7 @@ var DuplicateEntriesWindowCardValues = (function() {
 		getAbstractedTransformedProperty: getAbstractedTransformedProperty,
 		completeFirstLastDisplayName: completeFirstLastDisplayName,
 		getSimplifiedCard: getSimplifiedCard,
-		propertySet: propertySet
+		propertySet: propertySet,
+		enrichCardForComparison: enrichCardForComparison
 	};
 })();
