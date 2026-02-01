@@ -58,12 +58,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			DuplicateEntriesWindowPrefs.loadPrefs(this);
 			DuplicateEntriesWindowPrefs.applyPrefsToDOM(this);
 
-			try { /* for Thunderbird 68+. */
-				var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
-				this.stringBundle = Services.strings.createBundle("chrome://duplicatecontactsmanager/locale/duplicateContactsManager.properties");
-			} catch(e) {
-				this.stringBundle = document.getElementById('bundle_duplicateContactsManager');
-			}
+			this.getString = DuplicateEntriesWindowStrings.createStringProvider(this);
 			this.running = true;
 			this.statustext = document.getElementById('statusText');
 			this.progresstext = document.getElementById('progressText');
@@ -115,10 +110,6 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			this.statustext.textContent = this.getString('PleasePressStart');
 			document.getElementById('startbutton').setAttribute('label', this.getString('Start'));
 			document.getElementById('startbutton').focus();
-		},
-
-		getString: function(name) {
-			return this.stringBundle_old ? this.stringBundle_old.getString(name) : this.stringBundle.GetStringFromName(name);
 		},
 
 		/**

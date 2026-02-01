@@ -13,16 +13,17 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 ### Script load order (in `duplicateEntriesWindow.xul`)
 
 1. **duplicateEntriesWindowState.js**
-2. **duplicateEntriesWindowContacts.js**
-3. **duplicateEntriesWindowFields.js**
-4. **duplicateEntriesWindowPrefs.js**
-5. **duplicateEntriesWindowMatching.js**
-6. **duplicateEntriesWindowCardValues.js**
-7. **duplicateEntriesWindowComparison.js**
-8. **duplicateEntriesWindowUI.js**
-9. **duplicateEntriesWindowDisplay.js**
-10. **duplicateEntriesWindowSearch.js**
-11. **duplicateEntriesWindow.js** (main window object)
+2. **duplicateEntriesWindowStrings.js**
+3. **duplicateEntriesWindowContacts.js**
+4. **duplicateEntriesWindowFields.js**
+5. **duplicateEntriesWindowPrefs.js**
+6. **duplicateEntriesWindowMatching.js**
+7. **duplicateEntriesWindowCardValues.js**
+8. **duplicateEntriesWindowComparison.js**
+9. **duplicateEntriesWindowUI.js**
+10. **duplicateEntriesWindowDisplay.js**
+11. **duplicateEntriesWindowSearch.js**
+12. **duplicateEntriesWindow.js** (main window object)
 
 ---
 
@@ -40,7 +41,19 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 2. duplicateEntriesWindowContacts.js
+#### 2. duplicateEntriesWindowStrings.js
+
+**Role:** Strings (i18n) adapter. Insulates the rest of the app from how localized strings are loaded (legacy: Services.strings / stringbundle; TB128: e.g. browser.i18n).
+
+**Exports:** `createStringProvider(ctx)` — creates the string bundle for ctx (sets ctx.stringBundle) and returns a `getString(name)` function. Assign `ctx.getString = DuplicateEntriesWindowStrings.createStringProvider(ctx)` in main window init.
+
+**Responsibilities:** Single place that touches ChromeUtils/Services or document stringbundle for i18n. For TB128, a second implementation can use browser.i18n without changing callers.
+
+**Dependencies:** None (load after State).
+
+---
+
+#### 3. duplicateEntriesWindowContacts.js
 
 **Role:** Read/write access to Thunderbird address books and contact cards.
 
@@ -55,7 +68,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 3. duplicateEntriesWindowFields.js
+#### 4. duplicateEntriesWindowFields.js
 
 **Role:** Central definition of address-book field lists and property-type predicates.
 
@@ -70,7 +83,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 4. duplicateEntriesWindowPrefs.js
+#### 5. duplicateEntriesWindowPrefs.js
 
 **Role:** Load and save user preferences for the duplicate-finder window (pref branch `extensions.DuplicateContactsManager.*`).
 
@@ -84,7 +97,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 5. duplicateEntriesWindowMatching.js
+#### 6. duplicateEntriesWindowMatching.js
 
 **Role:** Normalization and matching logic for duplicate detection (names, emails, phones).
 
@@ -98,7 +111,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 6. duplicateEntriesWindowCardValues.js
+#### 7. duplicateEntriesWindowCardValues.js
 
 **Role:** Card value pipeline — get display or comparison values from a card, and build simplified cards for matching.
 
@@ -113,7 +126,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 7. duplicateEntriesWindowComparison.js
+#### 8. duplicateEntriesWindowComparison.js
 
 **Role:** Compare two cards for “equivalent or less information” and compute preference for which to delete.
 
@@ -129,7 +142,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 8. duplicateEntriesWindowUI.js
+#### 9. duplicateEntriesWindowUI.js
 
 **Role:** UI state transitions, progress/finished stats, low-level DOM helpers, and “which side to keep” selection.
 
@@ -144,7 +157,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 9. duplicateEntriesWindowDisplay.js
+#### 10. duplicateEntriesWindowDisplay.js
 
 **Role:** Build and clear the comparison table (side-by-side fields, equivalence symbols, editable inputs).
 
@@ -159,7 +172,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 10. duplicateEntriesWindowSearch.js
+#### 11. duplicateEntriesWindowSearch.js
 
 **Role:** Position stepping over card pairs and the main duplicate-find loop.
 

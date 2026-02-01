@@ -12,6 +12,7 @@
 	onunload="DuplicateEntriesWindow.OnUnloadWindow()">
 	<!-- Script load order is required: see ARCHITECTURE_AND_HISTORY.md. -->
 	<script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateEntriesWindowState.js"/>
+	<script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateEntriesWindowStrings.js"/>
 	<script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateEntriesWindowContacts.js"/>
 	<script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateEntriesWindowFields.js"/>
 	<script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateEntriesWindowPrefs.js"/>
