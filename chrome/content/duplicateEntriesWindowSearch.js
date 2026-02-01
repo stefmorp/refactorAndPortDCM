@@ -65,6 +65,9 @@ var DuplicateEntriesWindowSearch = (function() {
 		var lasttime = new Date();
 		while (skipPositionsToNext(ctx)) {
 			if ((new Date()) - lasttime >= 1000) {
+				// Force/enable Thunderbird every 1000 milliseconds to redraw the progress bar etc.
+				// See also http://stackoverflow.com/questions/2592335/how-to-report-progress-of-a-javascript-function
+				// As a nice side effect, this allows the stop button to take effect while this main loop is active!
 				setTimeout(function() { DuplicateEntriesWindowSearch.runIntervalAction(ctx); }, 13);
 				return;
 			}
