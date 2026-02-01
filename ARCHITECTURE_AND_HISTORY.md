@@ -12,22 +12,35 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ### Script load order (in `duplicateEntriesWindow.xul`)
 
-1. **duplicateEntriesWindowContacts.js**
-2. **duplicateEntriesWindowFields.js**
-3. **duplicateEntriesWindowPrefs.js**
-4. **duplicateEntriesWindowMatching.js**
-5. **duplicateEntriesWindowCardValues.js**
-6. **duplicateEntriesWindowComparison.js**
-7. **duplicateEntriesWindowUI.js**
-8. **duplicateEntriesWindowDisplay.js**
-9. **duplicateEntriesWindowSearch.js**
-10. **duplicateEntriesWindow.js** (main window object)
+1. **duplicateEntriesWindowState.js**
+2. **duplicateEntriesWindowContacts.js**
+3. **duplicateEntriesWindowFields.js**
+4. **duplicateEntriesWindowPrefs.js**
+5. **duplicateEntriesWindowMatching.js**
+6. **duplicateEntriesWindowCardValues.js**
+7. **duplicateEntriesWindowComparison.js**
+8. **duplicateEntriesWindowUI.js**
+9. **duplicateEntriesWindowDisplay.js**
+10. **duplicateEntriesWindowSearch.js**
+11. **duplicateEntriesWindow.js** (main window object)
 
 ---
 
 ### Module overview
 
-#### 1. duplicateEntriesWindowContacts.js
+#### 1. duplicateEntriesWindowState.js
+
+**Role:** Default initial state for the duplicate-entries window (plain data, no logic).
+
+**Exports:** `defaultState()` — returns a fresh object with initial property values (restart, abManager, vcards, BOOK_1/BOOK_2, positionSearch, preferences, phone prefixes, etc.). The main script builds `DuplicateEntriesWindow` by merging this with methods via `Object.assign(DuplicateEntriesWindowState.defaultState(), { ... })`.
+
+**Responsibilities:** Keep the long list of initial property values out of `duplicateEntriesWindow.js` so the main file stays short and readable.
+
+**Dependencies:** None (load first).
+
+---
+
+#### 2. duplicateEntriesWindowContacts.js
 
 **Role:** Read/write access to Thunderbird address books and contact cards.
 
@@ -38,11 +51,11 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 - Load all cards from one or two address books; optionally enrich each card for comparison (virtual properties) via the context’s `enrichCardForComparison`.
 - Read/write individual card properties and persist cards (save/delete).
 
-**Dependencies:** None (load first). The main window passes itself as `context` so that card enrichment can use Fields/CardValues logic.
+**Dependencies:** None (load after State). The main window passes itself as `context` so that card enrichment can use Fields/CardValues logic.
 
 ---
 
-#### 2. duplicateEntriesWindowFields.js
+#### 3. duplicateEntriesWindowFields.js
 
 **Role:** Central definition of address-book field lists and property-type predicates.
 
@@ -57,7 +70,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 3. duplicateEntriesWindowPrefs.js
+#### 4. duplicateEntriesWindowPrefs.js
 
 **Role:** Load and save user preferences for the duplicate-finder window (pref branch `extensions.DuplicateContactsManager.*`).
 
@@ -71,7 +84,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 4. duplicateEntriesWindowMatching.js
+#### 5. duplicateEntriesWindowMatching.js
 
 **Role:** Normalization and matching logic for duplicate detection (names, emails, phones).
 
@@ -85,7 +98,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 5. duplicateEntriesWindowCardValues.js
+#### 6. duplicateEntriesWindowCardValues.js
 
 **Role:** Card value pipeline — get display or comparison values from a card, and build simplified cards for matching.
 
@@ -100,7 +113,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 6. duplicateEntriesWindowComparison.js
+#### 7. duplicateEntriesWindowComparison.js
 
 **Role:** Compare two cards for “equivalent or less information” and compute preference for which to delete.
 
@@ -116,7 +129,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 7. duplicateEntriesWindowUI.js
+#### 8. duplicateEntriesWindowUI.js
 
 **Role:** UI state transitions, progress/finished stats, low-level DOM helpers, and “which side to keep” selection.
 
@@ -131,7 +144,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 8. duplicateEntriesWindowDisplay.js
+#### 9. duplicateEntriesWindowDisplay.js
 
 **Role:** Build and clear the comparison table (side-by-side fields, equivalence symbols, editable inputs).
 
@@ -146,7 +159,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 9. duplicateEntriesWindowSearch.js
+#### 10. duplicateEntriesWindowSearch.js
 
 **Role:** Position stepping over card pairs and the main duplicate-find loop.
 

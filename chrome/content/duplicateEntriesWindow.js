@@ -16,67 +16,7 @@
 
 if (typeof(DuplicateContactsManager_Running) == "undefined") {
 	/** Single window object; passed as context (ctx) to all duplicate-finder modules. Holds state and delegates to Contacts, Fields, Prefs, Matching, CardValues, Comparison, UI, Display, Search. */
-	var DuplicateEntriesWindow = {
-		restart: false,
-		abManager : null, // set in init() from DuplicateEntriesWindowContacts
-
-		stringBundle: null,
-		stringBundle_old: null,
-		prefsBranch: null,
-
-		statustext: '',
-		progresstext: '',
-		progressmeter: null,
-		window: null,
-
-		// Constants for first index of vcards arrays
-		BOOK_1 : 0,
-		BOOK_2 : 1,
-		// Contacts. Two-dimensional arrays; first index is the address book.
-		vcards          : new Array(),
-		vcardsSimplified: new Array(),
-
-		positionSearch: 0,
-		position1: 0,
-		position2: 0,
-		deferInteractive: true,
-		nowHandling: false,
-		positionDuplicates: 0,
-		duplicates: null,
-
-		table: null,
-		displayedFields: null,
-		editableFields: null,
-
-		sideKept: null,
-		keepLeftRadioButton: null,
-		keepRightRadioButton: null,
-
-		abURI1: null,
-		abURI2: null,
-		abDir1: null,
-		abDir2: null,
-
-		card1: null,
-		card2: null,
-
-		totalCardsBefore: 0,
-		totalCardsChanged: 0,
-		totalCardsSkipped: 0,
-		totalCardsDeleted1: 0,
-		totalCardsDeleted2: 0,
-		totalCardsDeletedAuto: 0,
-		autoremoveDups: false,
-		preserveFirst: false,
-		nonequivalentProperties : [],
-		ignoredFields : [],
-		consideredFields : [],
-		natTrunkPrefix : "", // national phone number trunk prefix
-		natTrunkPrefixReqExp : /^0([1-9])/, // typical RegExp for national trunk prefix
-		intCallPrefix : "", // international call prefix
-		intCallPrefixReqExp : /^00([1-9])/, // typical RegExp for international call prefix
-		countryCallingCode : "", // international country calling code
-
+	var DuplicateEntriesWindow = Object.assign(DuplicateEntriesWindowState.defaultState(), {
 		debug: function(str) {
 			console.log(str);
 		},
@@ -479,6 +419,6 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 
 		createSelectionList: function(cls, labels, values, selected) {
 			return DuplicateEntriesWindowUI.createSelectionList(cls, labels, values, selected);
-		},
-	}
+		}
+	});
 }
