@@ -77,6 +77,10 @@ var DuplicateEntriesWindowFields = (function() {
 		return isSet(property) ? "{}" : "";
 	}
 
+	/**
+	 * Gives preference to values with many non-digit/uppercase and special characters.
+	 * Umlauts have higher weight than their transcription (counted as more than one character).
+	 */
 	function charWeight(str, property) {
 		var pat = isPhoneNumber(property) ? /[ 0-9]/g : /[ a-z]/g;
 		return str.replace(pat, '').length;

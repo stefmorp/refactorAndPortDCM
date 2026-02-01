@@ -80,12 +80,13 @@ var DuplicateEntriesWindowComparison = (function() {
 		var c2_less_complete = true;
 		var props = propertyUnion(c1, c2);
 		var diffProps = context.nonequivalentProperties;
+		// TODO: combine these comparisons with those in displayCardField
 
 		for (var i = 0; i < props.length; i++) {
 			var property = props[i];
-			if (!context.consideredFields.includes(property) ||
-				context.isNumerical(property) ||
-				context.metaProperties.includes(property) ||
+			if (!context.consideredFields.includes(property) ||  /* do not compare ignored fields */
+				context.isNumerical(property) ||  /* ignore PopularityIndex, LastModifiedDate and other integers */
+				context.metaProperties.includes(property) ||  /* ignore meta properties */
 				context.isEmail(property) || context.isPhoneNumber(property))
 				continue;
 			var defaultValue = context.isSet(property) ? new Set() : context.defaultValue(property);

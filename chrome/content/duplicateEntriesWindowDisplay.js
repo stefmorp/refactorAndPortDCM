@@ -22,7 +22,7 @@ var DuplicateEntriesWindowDisplay = (function() {
 	 * Returns [both_empty, equ] for set comparison display (⊇ ⊆ ≅).
 	 */
 	function setRelation(card1, card2, property) {
-		const defaultValue_Set = new Set();
+		const defaultValue_Set = new Set();  /* should not really be needed here */
 		const value1 = card1.getProperty(property, defaultValue_Set);
 		const value2 = card2.getProperty(property, defaultValue_Set);
 		const both_empty = value1.size == 0 && value2.size == 0;
@@ -153,6 +153,7 @@ var DuplicateEntriesWindowDisplay = (function() {
 
 		cell1valuebox.setAttribute('flex', '2');
 		cell2valuebox.setAttribute('flex', '2');
+		/* valuebox id is like 'left_FieldName' / 'right_FieldName' for getCardFieldValues */
 		cell1valuebox.setAttribute('id',  'left_'+property);
 		cell2valuebox.setAttribute('id', 'right_'+property);
 
@@ -171,8 +172,10 @@ var DuplicateEntriesWindowDisplay = (function() {
 			cell2valuebox.height = 100;
 			cell1valuebox.setAttribute('flex', "");
 			cell2valuebox.setAttribute('flex', "");
+			/* preserve aspect ratio; flex would be ignored if set before appendChild(row) */
 			cell1valuebox.src = card1.getProperty('PhotoURI', "");
 			cell2valuebox.src = card2.getProperty('PhotoURI', "");
+			/* actual image will be loaded asynchronously */
 		}
 	}
 
@@ -265,6 +268,7 @@ var DuplicateEntriesWindowDisplay = (function() {
 
 	/**
 	 * Returns an object with all editable field values for the given side ('left' or 'right').
+	 * Used when reading edited values from the table (save field in list for later retrieval).
 	 */
 	function getCardFieldValues(ctx, side) {
 		var result = {};

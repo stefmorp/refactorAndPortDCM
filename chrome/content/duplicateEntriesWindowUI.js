@@ -25,6 +25,7 @@ var DuplicateEntriesWindowUI = (function() {
 	function show(id) {
 		document.getElementById(id).style.display = '';
 	}
+	/** Enables scroll bar and stretches horizontally (vs plain show). */
 	function show_hack(id) {
 		document.getElementById(id).style.display = '-moz-inline-stack';
 	}
@@ -207,6 +208,8 @@ var DuplicateEntriesWindowUI = (function() {
 
 	/**
 	 * Updates progress meter and progress text; refreshes deleted-info labels.
+	 * Status will not be visible immediately during search; see also
+	 * http://forums.mozillazine.org/viewtopic.php?p=5300605
 	 */
 	function updateProgress(ctx) {
 		var current, pos, max;
@@ -216,7 +219,7 @@ var DuplicateEntriesWindowUI = (function() {
 			var num1 = ctx.vcards[ctx.BOOK_1].length;
 			var num2 = ctx.vcards[ctx.BOOK_2].length;
 			max = ctx.abDir1 == ctx.abDir2 ? (num1 * (num1 - 1) / 2) : (num1 * num2);
-			if (pos > max)
+			if (pos > max)  /* happens at end */
 				pos = max;
 		} else {
 			current = 'parity';

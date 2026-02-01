@@ -29,6 +29,7 @@ var DuplicateEntriesWindowCardValues = (function() {
 		if (ctx.ignoredFields.includes(property))
 			return defaultValue;
 		var value = DuplicateEntriesWindowMatching.pruneText(getProperty(ctx, card, property), property, ctx.getNormalizationConfig());
+		/* Strip any stray email address duplicates from names, inserted by some email clients as default names */
 		if (ctx.isFirstLastDisplayName(property)) {
 			if (value == getPrunedProperty(ctx, card, 'PrimaryEmail') || value == getPrunedProperty(ctx, card, 'SecondEmail'))
 				return defaultValue;
