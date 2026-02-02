@@ -12,14 +12,33 @@ var DuplicateEntriesWindowPrefs = (function() {
 
 	var PREF_BRANCH_ID = "extensions.DuplicateContactsManager.";
 
-	function getPrefsBranch() {
+	/**
+	 * Legacy prefs backend: wraps nsIPrefBranch. Same interface can be implemented
+	 * by a WebExt backend (e.g. browser.storage) for TB128 without changing callers.
+	 * Backend interface: getBoolPref(name), getCharPref(name), setBoolPref(name, value), setCharPref(name, value).
+	 */
+	function createLegacyBackend() {
 		try {
 			var Prefs = Components.classes["@mozilla.org/preferences-service;1"]
 				.getService(Components.interfaces.nsIPrefService);
-			return Prefs.getBranch(PREF_BRANCH_ID);
+			var branch = Prefs.getBranch(PREF_BRANCH_ID);
+			return {
+				getBoolPref: function(name) { return branch.getBoolPref(name); },
+				getCharPref: function(name) { return branch.getCharPref(name); },
+				setBoolPref: function(name, value) { branch.setBoolPref(name, value); },
+				setCharPref: function(name, value) { branch.setCharPref(name, value); }
+			};
 		} catch (e) {
 			return null;
 		}
+	}
+
+	/**
+	 * Returns the prefs backend for the duplicate-entries window. Stored on ctx as ctx.prefsBranch.
+	 * Legacy: nsIPrefBranch wrapper. TB128: can return a backend that uses browser.storage.
+	 */
+	function getPrefsBranch() {
+		return createLegacyBackend();
 	}
 
 	/**

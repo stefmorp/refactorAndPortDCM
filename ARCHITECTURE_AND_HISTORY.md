@@ -85,12 +85,14 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 #### 5. duplicateEntriesWindowPrefs.js
 
-**Role:** Load and save user preferences for the duplicate-finder window (pref branch `extensions.DuplicateContactsManager.*`).
+**Role:** Load and save user preferences for the duplicate-finder window (pref branch `extensions.DuplicateContactsManager.*`). Insulates callers from how prefs are stored (legacy: nsIPrefBranch; TB128: e.g. browser.storage).
 
 **Exports:** `getPrefsBranch`, `loadPrefs(ctx)`, `applyPrefsToDOM(ctx)`, `readPrefsFromDOM(ctx)`, `savePrefs(ctx)`.
 
+**Backend interface:** `ctx.prefsBranch` is a backend object with `getBoolPref(name)`, `getCharPref(name)`, `setBoolPref(name, value)`, `setCharPref(name, value)`. Legacy implementation wraps nsIPrefBranch; a WebExt backend can be added for TB128 without changing loadPrefs/savePrefs.
+
 **Responsibilities:**
-- Create the prefs branch; read prefs into the window context (autoremove, preserve first book, defer interactive, phone prefixes, ignored fields).
+- Create the prefs backend (legacy or future WebExt); read prefs into the window context (autoremove, preserve first book, defer interactive, phone prefixes, ignored fields).
 - Sync context to/from the options form (apply to DOM on init, read from DOM on Start, write back to prefs when saving).
 
 **Dependencies:** Expects `ctx` to have Fields-derived data (`ignoredFieldsDefault`, `addressBookFields`, `consideredFields`, `isSet`, `matchablesList`) and to set `prefsBranch` from `getPrefsBranch()`.
