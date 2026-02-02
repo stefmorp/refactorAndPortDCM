@@ -217,7 +217,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		},
 
 		updateAbCard: function(abDir, book, index, side) {
-			var card = this.vcards[book][index];
+			var card = this.vcards[book][index];  /* wrapped (getProperty, setProperty) from Contacts */
 
 			// see what's been modified
 			var updateFields = this.getCardFieldValues(side);
@@ -227,11 +227,11 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 				if (card.getProperty(property, defaultValue) != updateFields[property]) {
 				// not using this.getProperty here to give a chance to update wrongly empty field
 					try {
-						// this.debug("updating "+property+" from "+card.getProperty(property, defaultValue)+" to "+updateFields[property]);
 						card.setProperty(property, updateFields[property]);
 						entryModified = true;
 					} catch (e) {
-						alert("Internal error: cannot set field '"+property+"' of "+card.displayName+": "+e);
+						var nameForError = card.getProperty ? card.getProperty('DisplayName', '') : (card.displayName || '');
+						alert("Internal error: cannot set field '"+property+"' of "+nameForError+": "+e);
 					}
 				}
 			}
@@ -241,7 +241,8 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 					DuplicateEntriesWindowContacts.saveCard(abDir, card);
 					this.totalCardsChanged++;
 				} catch (e) {
-					alert("Internal error: cannot update card '"+card.displayName+"': "+e);
+					var nameForError = card.getProperty ? card.getProperty('DisplayName', '') : (card.displayName || '');
+					alert("Internal error: cannot update card '"+nameForError+"': "+e);
 				}
 			}
 		},
@@ -259,7 +260,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		 * Deletes the card identified by 'index' from the given address book.
 		 */
 		deleteAbCard: function(abDir, book, index, auto) {
-			var card = this.vcards[book][index];
+			var card = this.vcards[book][index];  /* wrapped from Contacts; save/delete use getRawCard() */
 			try {
 				DuplicateEntriesWindowContacts.deleteCard(abDir, card);
 				if (abDir == this.abDir1)
@@ -269,7 +270,8 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 				if (auto)
 					this.totalCardsDeletedAuto++;
 			} catch (e) {
-				alert("Internal error: cannot remove card '"+card.displayName+"': "+e);
+				var nameForError = card.getProperty ? card.getProperty('DisplayName', '') : (card.displayName || '');
+				alert("Internal error: cannot remove card '"+nameForError+"': "+e);
 			}
 			this.vcards[book][index] = null; // set empty element, but leave element number as is
 		},
@@ -335,7 +337,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		readAddressBooks: function() {
 			var Contacts = DuplicateEntriesWindowContacts;
 			if (!this.abDir1.isMailList) {
-				var result1 = Contacts.getAllAbCards(this.abDir1, this);
+				var result1 = Contacts.getAllAbCards(this.abDir1, this);  /* cards are wrapped */
 				this.vcards[this.BOOK_1] = result1.cards;
 				this.vcardsSimplified[this.BOOK_1] = new Array();
 				this.totalCardsBefore = result1.totalBefore;

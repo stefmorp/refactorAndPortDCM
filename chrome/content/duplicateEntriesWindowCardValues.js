@@ -75,7 +75,7 @@ var DuplicateEntriesWindowCardValues = (function() {
 	/**
 	 * @param {object} ctx - context (window)
 	 * @param {[string, string, string]} nameArray - [firstName, lastName, displayName]
-	 * @param {nsIAbCard} card
+	 * @param {object} card - Wrapped card (getProperty); from Contacts.
 	 * @returns {[string, string, string]} [firstName, lastName, displayName]
 	 */
 	function completeFirstLastDisplayName(ctx, nameArray, card) {

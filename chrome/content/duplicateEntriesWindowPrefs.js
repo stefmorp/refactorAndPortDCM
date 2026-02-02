@@ -94,6 +94,7 @@ var DuplicateEntriesWindowPrefs = (function() {
 
 	/**
 	 * Reads current values from the options form into ctx.
+	 * Note: getAttribute('checked') returns string "true" or attribute value; setBoolPref accepts it.
 	 */
 	function readPrefsFromDOM(ctx) {
 		ctx.autoremoveDups = document.getElementById('autoremove').getAttribute('checked');

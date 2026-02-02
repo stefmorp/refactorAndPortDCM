@@ -137,9 +137,9 @@ var DuplicateEntriesWindowDisplay = (function() {
 			cell2valuebox = ctx.createSelectionList(null, labels, values, rightValue);
 		} else {
 			function make_valuebox(value) {
-				const valuebox = editable ? document.createElement('textbox') :
-				                 property == '__MailListNames' ? document.createElement('description')
-				                                               : document.createElement('label');
+				const valuebox = editable ? W.createTextbox() :
+				                 property == '__MailListNames' ? W.createDescription()
+				                                               : W.createLabel();
 				valuebox.className = 'textbox';
 				if (property == '__MailListNames')
 					valuebox.textContent = value;
@@ -277,6 +277,7 @@ var DuplicateEntriesWindowDisplay = (function() {
 		for (var i = 0; i < ctx.editableFields.length; i++) {
 			const id = side + '_' + ctx.editableFields[i];
 			const valuebox = document.getElementById(id);
+			/* menulist has selectedItem; textbox/label have value */
 			const value = valuebox.selectedItem ? valuebox.selectedItem.value : valuebox.value;
 			result[ctx.editableFields[i]] = value;
 		}
