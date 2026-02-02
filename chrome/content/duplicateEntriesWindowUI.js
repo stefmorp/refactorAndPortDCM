@@ -2,6 +2,7 @@
 // file: duplicateEntriesWindowUI.js
 //
 // Grouped UI state transitions, progress display, finished stats, low-level DOM helpers, and setContactLeftRight.
+// createSelectionList delegates to DuplicateEntriesWindowWidgets (no raw createElement for dropdown).
 // This module provides enable, disable, show, hide, make_visible, make_invisible, show_hack (by id); the main window delegates to them.
 // ctx must have: getString, and optionally window. For updateProgress/updateDeletedInfo/showFinishedStats: progressmeter, progresstext,
 // vcards, BOOK_1, BOOK_2, abDir1, abDir2, deferInteractive, nowHandling, positionSearch, positionDuplicates, duplicates,
@@ -40,31 +41,12 @@ var DuplicateEntriesWindowUI = (function() {
 	}
 
 	/**
-	 * Creates a XUL menulist (dropdown) with the given labels and values; optional class and selected value.
+	 * Creates a dropdown with the given labels and values; optional class and selected value.
+	 * Delegates to DuplicateEntriesWindowWidgets (legacy: XUL menulist; TB128: HTML select).
 	 * Used for address book selection in init() and for PreferMailFormat/boolean fields in the comparison table.
 	 */
 	function createSelectionList(cls, labels, values, selected) {
-		var menulist = document.createElement('menulist');
-		if (cls != null)
-			menulist.setAttribute('class', cls);
-		var menupopup = document.createElement('menupopup');
-		if (cls != null)
-			menupopup.setAttribute('class', cls);
-		for (var i = 0; i < labels.length; i++) {
-			var menuitem = document.createElement('menuitem');
-			menuitem.setAttribute('crop', 'end');
-			if (cls != null)
-				menuitem.setAttribute('class', cls);
-			menuitem.setAttribute('label', labels[i]);
-			menuitem.setAttribute('value', values[i]);
-			if (values[i] == selected) {
-				menuitem.setAttribute('selected', 'true');
-				menupopup.selectedItem = menuitem;
-			}
-			menupopup.appendChild(menuitem);
-		}
-		menulist.appendChild(menupopup);
-		return menulist;
+		return DuplicateEntriesWindowWidgets.createSelectionList(cls, labels, values, selected);
 	}
 
 	/**

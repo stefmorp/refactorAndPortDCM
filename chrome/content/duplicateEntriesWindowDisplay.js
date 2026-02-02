@@ -2,7 +2,7 @@
 // file: duplicateEntriesWindowDisplay.js
 //
 // Comparison table display: displayCardData, displayCardField, SetRelation,
-// purgeAttributesTable, getCardFieldValues.
+// purgeAttributesTable, getCardFieldValues. Uses DuplicateEntriesWindowWidgets for all element creation (no raw createElement).
 // ctx must have: attributesTableRows, displayedFields, editableFields, consideredFields,
 // nonequivalentProperties, matchablesList, getString, getProperty, getAbstractedTransformedProperty,
 // defaultValue, isSet, isEmail, isPhoneNumber, isText, isNumerical, isSelection,
@@ -11,6 +11,8 @@
 
 var DuplicateEntriesWindowDisplay = (function() {
 	"use strict";
+
+	var W = DuplicateEntriesWindowWidgets;
 
 	function pushIfNew(elem, array) {
 		if (!array.includes(elem))
@@ -51,10 +53,10 @@ var DuplicateEntriesWindowDisplay = (function() {
 		if (editable)
 			pushIfNew(property, ctx.editableFields);
 
-		const cell1 = document.createElement('hbox');
-		const cell2 = document.createElement('hbox');
-		const cellEqu = document.createElement('hbox');
-		const descEqu = document.createElement('description');
+		const cell1 = W.createHbox();
+		const cell2 = W.createHbox();
+		const cellEqu = W.createHbox();
+		const descEqu = W.createDescription();
 		cellEqu.className = 'equivalence';
 		cellEqu.appendChild(descEqu);
 
@@ -118,8 +120,8 @@ var DuplicateEntriesWindowDisplay = (function() {
 
 		if (property == 'PhotoURI') {
 			descEqu.style.marginTop = '1em';
-			cell1valuebox = document.createElement('image');
-			cell2valuebox = document.createElement('image');
+			cell1valuebox = W.createImage();
+			cell2valuebox = W.createImage();
 		} else if (ctx.isSelection(property)) {
 			var labels;
 			if (property == 'PreferMailFormat') {
@@ -213,8 +215,8 @@ var DuplicateEntriesWindowDisplay = (function() {
 		}
 		for (var j = 0; j < fields.length; j++) {
 			const property = fields[j];
-			var row = document.createElement('row');
-			var labelcell = document.createElement('label');
+			var row = W.createRow();
+			var labelcell = W.createLabel();
 			var localName = property;
 			try {
 				localName = ctx.getString(property + '_label');
@@ -223,9 +225,9 @@ var DuplicateEntriesWindowDisplay = (function() {
 			labelcell.setAttribute('class', 'field');
 			row.appendChild(labelcell);
 			if (ctx.matchablesList.includes(property)) {
-				const cell1 = document.createElement('label');
-				const cellEqu = document.createElement('hbox');
-				const descEqu = document.createElement('description');
+				const cell1 = W.createLabel();
+				const cellEqu = W.createHbox();
+				const descEqu = W.createDescription();
 				cellEqu.className = 'equivalence';
 				cellEqu.appendChild(descEqu);
 				if (namesmatch && property == '__Names' ||

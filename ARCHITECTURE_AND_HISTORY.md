@@ -20,10 +20,11 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 6. **duplicateEntriesWindowMatching.js**
 7. **duplicateEntriesWindowCardValues.js**
 8. **duplicateEntriesWindowComparison.js**
-9. **duplicateEntriesWindowUI.js**
-10. **duplicateEntriesWindowDisplay.js**
-11. **duplicateEntriesWindowSearch.js**
-12. **duplicateEntriesWindow.js** (main window object)
+9. **duplicateEntriesWindowWidgets.js**
+10. **duplicateEntriesWindowUI.js**
+11. **duplicateEntriesWindowDisplay.js**
+12. **duplicateEntriesWindowSearch.js**
+13. **duplicateEntriesWindow.js** (main window object)
 
 ---
 
@@ -130,7 +131,19 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 8. duplicateEntriesWindowComparison.js
+#### 8. duplicateEntriesWindowWidgets.js
+
+**Role:** DOM/Widget adapter. Insulates UI and Display from element type (legacy: XUL menulist, hbox, description, textbox, label, image, row; TB128: HTML select, div, span, input, label, img, tr).
+
+**Exports:** `createSelectionList(cls, labels, values, selected)`, `createHbox()`, `createDescription()`, `createLabel()`, `createTextbox()`, `createImage()`, `createRow()`.
+
+**Responsibilities:** Only this module calls `document.createElement` with tag names for dynamic UI. UI and Display use Widgets.* instead of raw createElement so that for TB128 a second implementation (HTML elements) can be added without changing UI/Display logic.
+
+**Dependencies:** None (load after Comparison, before UI and Display).
+
+---
+
+#### 9. duplicateEntriesWindowComparison.js
 
 **Role:** Compare two cards for “equivalent or less information” and compute preference for which to delete.
 
@@ -146,7 +159,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 9. duplicateEntriesWindowUI.js
+#### 10. duplicateEntriesWindowUI.js
 
 **Role:** UI state transitions, progress/finished stats, low-level DOM helpers, and “which side to keep” selection.
 
@@ -176,7 +189,7 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
-#### 11. duplicateEntriesWindowSearch.js
+#### 12. duplicateEntriesWindowSearch.js
 
 **Role:** Position stepping over card pairs and the main duplicate-find loop.
 
