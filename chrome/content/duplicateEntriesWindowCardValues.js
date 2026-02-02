@@ -111,7 +111,7 @@ var DuplicateEntriesWindowCardValues = (function() {
 
 	function getSimplifiedCard(ctx, book, i) {
 		if (!ctx.vcardsSimplified[book][i] && ctx.vcards[book][i]) {
-			var card = ctx.vcards[book][i].QueryInterface(Components.interfaces.nsIAbCard);
+			var card = ctx.vcards[book][i];  /* wrapped card: getProperty, setProperty */
 			var vcard = {};
 			var fn = getAbstractedTransformedProperty(ctx, card, 'FirstName');
 			var ln = getAbstractedTransformedProperty(ctx, card, 'LastName');

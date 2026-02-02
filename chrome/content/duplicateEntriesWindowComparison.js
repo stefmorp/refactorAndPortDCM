@@ -41,27 +41,26 @@ var DuplicateEntriesWindowComparison = (function() {
 	}
 
 	/**
-	 * Returns the union of property names from two address book cards.
-	 * @param {nsIAbCard} c1
-	 * @param {nsIAbCard} c2
+	 * Returns the union of property names from two address book cards (stable card interface: getPropertyNames()).
+	 * @param {object} c1 - Card (wrapped: getPropertyNames())
+	 * @param {object} c2 - Card (wrapped: getPropertyNames())
 	 * @returns {string[]}
 	 */
 	function propertyUnion(c1, c2) {
 		var union = [];
-		for (var i = 0; i < 2; i++) {
-			var it = i === 0 ? c1.properties : c2.properties;
-			while (it.hasMoreElements()) {
-				var name = it.getNext().QueryInterface(Components.interfaces.nsIProperty).name;
-				pushIfNew(name, union);
-			}
-		}
+		var n1 = c1.getPropertyNames ? c1.getPropertyNames() : [];
+		var n2 = c2.getPropertyNames ? c2.getPropertyNames() : [];
+		for (var i = 0; i < n1.length; i++)
+			pushIfNew(n1[i], union);
+		for (var j = 0; j < n2.length; j++)
+			pushIfNew(n2[j], union);
 		return union;
 	}
 
 	/**
 	 * Compares two address book cards for "equivalent or less information".
-	 * @param {nsIAbCard} c1 - Card 1
-	 * @param {nsIAbCard} c2 - Card 2
+	 * @param {object} c1 - Card 1 (wrapped: getProperty, getPropertyNames)
+	 * @param {object} c2 - Card 2 (wrapped: getProperty, getPropertyNames)
 	 * @param {object} context - Must have: consideredFields, metaProperties,
 	 *   isNumerical(property), isEmail(property), isPhoneNumber(property), isSet(property), isText(property),
 	 *   defaultValue(property), getAbstractedTransformedProperty(card, property), nonequivalentProperties (array)

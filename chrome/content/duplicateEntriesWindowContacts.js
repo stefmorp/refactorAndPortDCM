@@ -15,6 +15,30 @@ var DuplicateEntriesWindowContacts = (function() {
 
 	var abManager = null;
 
+	/**
+	 * Stable card interface for insulation: getProperty(name, default), setProperty(name, value),
+	 * getPropertyNames(), getRawCard(). Legacy wraps nsIAbCard; TB128 can wrap a different type.
+	 */
+	function wrapCard(abCard) {
+		return {
+			_card: abCard,
+			getProperty: function(name, defaultValue) { return abCard.getProperty(name, defaultValue); },
+			setProperty: function(name, value) { abCard.setProperty(name, value); },
+			getPropertyNames: function() {
+				var names = [];
+				var it = abCard.properties;
+				if (it) {
+					while (it.hasMoreElements()) {
+						var prop = it.getNext().QueryInterface(Components.interfaces.nsIProperty);
+						names.push(prop.name);
+					}
+				}
+				return names;
+			},
+			getRawCard: function() { return this._card; }
+		};
+	}
+
 	function getAbManager() {
 		if (!abManager) {
 			abManager = Components.classes["@mozilla.org/abmanager;1"]
@@ -33,11 +57,11 @@ var DuplicateEntriesWindowContacts = (function() {
 	}
 
 	/**
-	 * Returns all contact cards from a directory. For each card, context.enrichCardForComparison(card, mailLists)
-	 * is called so the caller can attach virtual properties (e.g. __NonEmptyFields, __MailListNames).
+	 * Returns all contact cards from a directory (wrapped: stable interface getProperty, setProperty, getPropertyNames).
+	 * For each card, context.enrichCardForComparison(card, mailLists) is called.
 	 * @param {nsIAbDirectory} directory - Address book directory
 	 * @param {object} context - Must have enrichCardForComparison(card, mailLists)
-	 * @returns {{ cards: Array, totalBefore: number }} - cards array and total count (for single-book mode)
+	 * @returns {{ cards: Array, totalBefore: number }} - cards array (wrapped) and total count
 	 */
 	function getAllAbCards(directory, context) {
 		var abCards = [];
@@ -75,8 +99,8 @@ var DuplicateEntriesWindowContacts = (function() {
 	}
 
 	/**
-	 * Reads a single property from a card.
-	 * @param {nsIAbCard} card
+	 * Reads a single property from a card (wrapped or raw).
+	 * @param {object} card - Card with getProperty(name, default)
 	 * @param {string} property
 	 * @param {string|number} defaultValue
 	 * @returns {string|number}
@@ -87,7 +111,7 @@ var DuplicateEntriesWindowContacts = (function() {
 
 	/**
 	 * Writes a single property to a card (in memory only). Call saveCard to persist.
-	 * @param {nsIAbCard} card
+	 * @param {object} card - Card with setProperty(name, value)
 	 * @param {string} property
 	 * @param {string|number} value
 	 */
@@ -98,23 +122,25 @@ var DuplicateEntriesWindowContacts = (function() {
 	/**
 	 * Persists card changes to the address book.
 	 * @param {nsIAbDirectory} abDir - Directory the card belongs to
-	 * @param {nsIAbCard} card - Card with modified properties
+	 * @param {object} card - Card (wrapped or raw) with modified properties
 	 * @throws on failure
 	 */
 	function saveCard(abDir, card) {
-		abDir.modifyCard(card);
+		var raw = (card.getRawCard && card.getRawCard()) || card;
+		abDir.modifyCard(raw);
 	}
 
 	/**
 	 * Deletes a card from the address book.
 	 * @param {nsIAbDirectory} abDir - Directory the card belongs to
-	 * @param {nsIAbCard} card - Card to delete
+	 * @param {object} card - Card (wrapped or raw) to delete
 	 * @throws on failure
 	 */
 	function deleteCard(abDir, card) {
+		var raw = (card.getRawCard && card.getRawCard()) || card;
 		var deleteCards = Components.classes["@mozilla.org/array;1"]
 			.createInstance(Components.interfaces.nsIMutableArray);
-		deleteCards.appendElement(card, false);
+		deleteCards.appendElement(raw, false);
 		abDir.deleteCards(deleteCards);
 	}
 

@@ -55,14 +55,16 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 #### 3. duplicateEntriesWindowContacts.js
 
-**Role:** Read/write access to Thunderbird address books and contact cards.
+**Role:** Read/write access to Thunderbird address books and contact cards. Insulates the rest of the app from the card type (legacy: nsIAbCard; TB128: can wrap a different type).
 
 **Exports:** `getAbManager`, `getDirectory(uri)`, `getAllAbCards(directory, context)`, `getCardProperty`, `setCardProperty`, `saveCard(abDir, card)`, `deleteCard(abDir, card)`.
 
+**Stable card interface:** Cards returned from `getAllAbCards` are wrapped with `getProperty(name, default)`, `setProperty(name, value)`, `getPropertyNames()`, `getRawCard()`. CardValues and Comparison use only this interface; save/delete use `getRawCard()` when the directory API requires the raw card. Legacy implementation wraps nsIAbCard; a TB128 implementation can wrap the new contact type without changing callers.
+
 **Responsibilities:**
 - Obtain the nsIAbManager and resolve directory URIs to nsIAbDirectory.
-- Load all cards from one or two address books; optionally enrich each card for comparison (virtual properties) via the context’s `enrichCardForComparison`.
-- Read/write individual card properties and persist cards (save/delete).
+- Load all cards from one or two address books (return wrapped cards); optionally enrich each card for comparison (virtual properties) via the context’s `enrichCardForComparison`.
+- Read/write individual card properties and persist cards (save/delete); accept wrapped or raw card for save/delete.
 
 **Dependencies:** None (load after State). The main window passes itself as `context` so that card enrichment can use Fields/CardValues logic.
 
