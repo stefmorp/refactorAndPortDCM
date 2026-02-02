@@ -41,7 +41,8 @@ var DuplicateEntriesWindowComparison = (function() {
 	}
 
 	/**
-	 * Returns the union of property names from two address book cards (stable card interface: getPropertyNames()).
+	 * Returns the union of property names from two address book cards.
+	 * Uses stable card interface only (getPropertyNames); no XPCOM. Cards are wrapped by Contacts.
 	 * @param {object} c1 - Card (wrapped: getPropertyNames())
 	 * @param {object} c2 - Card (wrapped: getPropertyNames())
 	 * @returns {string[]}

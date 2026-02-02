@@ -3,6 +3,7 @@
 //
 // Strings (i18n) adapter for the duplicate-entries window. Insulates the rest of the app
 // from how localized strings are loaded (legacy: Services.strings / stringbundle; TB128: e.g. browser.i18n).
+// Only this module touches ChromeUtils/Services or the stringbundle for i18n; callers use ctx.getString(name).
 // Exports createStringProvider(ctx); assign ctx.getString = DuplicateEntriesWindowStrings.createStringProvider(ctx) in init.
 // Load before duplicateEntriesWindow.js. No other module dependencies.
 
@@ -14,7 +15,8 @@ var DuplicateEntriesWindowStrings = (function() {
 
 	/**
 	 * Creates the string bundle for ctx (legacy implementation) and returns a getString(name) function.
-	 * Sets ctx.stringBundle. Call once from init; then assign ctx.getString = DuplicateEntriesWindowStrings.createStringProvider(ctx).
+	 * Sets ctx.stringBundle. For TB128, a second implementation can use browser.i18n.getMessage without changing callers.
+	 * Call once from init; then assign ctx.getString = DuplicateEntriesWindowStrings.createStringProvider(ctx).
 	 * @param {object} ctx - Window context (will get ctx.stringBundle set)
 	 * @returns {function(string): string} getString(name)
 	 */

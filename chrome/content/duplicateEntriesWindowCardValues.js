@@ -111,7 +111,8 @@ var DuplicateEntriesWindowCardValues = (function() {
 
 	function getSimplifiedCard(ctx, book, i) {
 		if (!ctx.vcardsSimplified[book][i] && ctx.vcards[book][i]) {
-			var card = ctx.vcards[book][i];  /* wrapped card: getProperty, setProperty */
+			/* Card is wrapped by Contacts: getProperty, setProperty; no XPCOM here */
+			var card = ctx.vcards[book][i];
 			var vcard = {};
 			var fn = getAbstractedTransformedProperty(ctx, card, 'FirstName');
 			var ln = getAbstractedTransformedProperty(ctx, card, 'LastName');

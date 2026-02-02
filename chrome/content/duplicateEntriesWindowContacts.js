@@ -2,6 +2,8 @@
 // file: duplicateEntriesWindowContacts.js
 //
 // Read/write logic for Thunderbird address book contacts (cards and directories).
+// Insulates callers from card type: getAllAbCards returns wrapped cards (getProperty, setProperty, getPropertyNames, getRawCard);
+// only this module touches nsIAbCard; TB128 can wrap a different contact type without changing CardValues/Comparison.
 // Used by duplicateEntriesWindow.js. Load this script before duplicateEntriesWindow.js.
 
 /*
@@ -82,7 +84,7 @@ var DuplicateEntriesWindowContacts = (function() {
 							}
 							mailLists.push([abCard.displayName, primaryEmails]);
 						} else {
-							abCards.push(abCard);
+							abCards.push(wrapCard(abCard));
 						}
 					}
 				}

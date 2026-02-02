@@ -2,6 +2,7 @@
 // file: duplicateEntriesWindowPrefs.js
 //
 // Load/save preferences for the duplicate-entries window. Prefix: extensions.DuplicateContactsManager.
+// Insulates callers from storage: ctx.prefsBranch is a backend (legacy: nsIPrefBranch; TB128: e.g. browser.storage).
 // loadPrefs(ctx) reads from prefs branch into ctx; applyPrefsToDOM(ctx) writes ctx to form;
 // readPrefsFromDOM(ctx) reads form into ctx; savePrefs(ctx) writes ctx to prefs branch.
 // ctx must have: prefsBranch (set by getPrefsBranch or caller), ignoredFieldsDefault, addressBookFields, ignoredFields, consideredFields, isSet, matchablesList.
