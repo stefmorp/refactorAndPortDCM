@@ -106,7 +106,8 @@
 <!--            src="chrome://gcontactsync/content/GHttpRequest.js"/>-->
 <!--    <script type="application/x-javascript"-->
 <!--            src="chrome://gcontactsync/content/Pref.js"/>-->
- <script type="application/x-javascript"  src="chrome://duplicatecontactsmanager/content/Preferences.js"/>
+    <script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateContactsManagerAddonPrefs.js"/>
+    <script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/Preferences.js"/>
 <!--    <script type="application/x-javascript"-->
 <!--            src="chrome://gcontactsync/content/ThrottleTest.js"/>-->
 <!--    <script type="application/x-javascript"-->

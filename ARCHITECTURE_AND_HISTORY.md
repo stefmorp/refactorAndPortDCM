@@ -58,7 +58,9 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 **Role:** Read/write access to Thunderbird address books and contact cards. Insulates the rest of the app from the card type (legacy: nsIAbCard; TB128: can wrap a different type).
 
-**Exports:** `getAbManager`, `getDirectory(uri)`, `getAllAbCards(directory, context)`, `getCardProperty`, `setCardProperty`, `saveCard(abDir, card)`, `deleteCard(abDir, card)`.
+**Exports:** `getAbManager`, `getDirectory(uri)`, `getAddressBookList(abManager)`, `getSelectedDirectoryFromOpener()`, `getAllAbCards(directory, context)`, `getCardProperty`, `setCardProperty`, `saveCard(abDir, card)`, `deleteCard(abDir, card)`.
+
+**Address book list:** `getAddressBookList(abManager)` returns `{ dirNames, URIs }` and insulates directory enumeration (legacy: hasMoreElements/getNext; TB128 may differ). `getSelectedDirectoryFromOpener()` returns the selected address book URI when the window is opened from the Address Book UI (legacy: window.opener.GetSelectedDirectory; TB128 may use messaging).
 
 **Stable card interface:** Cards returned from `getAllAbCards` are wrapped with `getProperty(name, default)`, `setProperty(name, value)`, `getPropertyNames()`, `getRawCard()`. CardValues and Comparison use only this interface; save/delete use `getRawCard()` when the directory API requires the raw card. Legacy implementation wraps nsIAbCard; a TB128 implementation can wrap the new contact type without changing callers.
 
@@ -219,7 +221,22 @@ The add-on’s duplicate-finder window is implemented as a single XUL window (`d
 
 ---
 
+### Insulation adapters (outside duplicate-entries window)
+
+These adapters keep the rest of the add-on independent of platform APIs that may change in Thunderbird 128+.
+
+- **duplicateContactsManagerLauncher.js** — Opens the duplicate-finder window. Legacy: `window.open(chrome URL)`; TB128: e.g. `browser.windows.create(extension URL)`. Load before `duplicateContactsManager.js` in overlays (menuOverlay.xul, menuOverlayABook.xul, duplicateContactsManager.xul). Exports: `openDuplicatesWindow()`.
+
+- **duplicateContactsManagerAddonPrefs.js** — Registers extension preference definitions (options dialog). Legacy: `Preferences.addAll` from preferencesBindings; TB128: may use storage or options_ui schema. Load after preferencesBindings.js and before Preferences.js in options.xul. Exports: `addAddonPrefs()`.
+
+---
+
 ## Change history
+
+### Version 2.1.7 (insulation for TB128)
+* **Launcher adapter:** duplicateContactsManagerLauncher.js — open duplicate-finder window via `openDuplicatesWindow()`; duplicateContactsManager.js no longer calls `window.open` directly. Overlays load Launcher before duplicateContactsManager.js.
+* **Address book list adapter:** DuplicateEntriesWindowContacts.getAddressBookList(abManager) and getSelectedDirectoryFromOpener(); main window init uses these instead of enumerating abManager.directories or calling window.opener.GetSelectedDirectory. Fix: selected-directory regex returns full URI (match[0]) instead of match[1].
+* **Addon prefs adapter:** duplicateContactsManagerAddonPrefs.js — register option prefs via addAddonPrefs(); Preferences.js calls adapter instead of Preferences.addAll directly. options.xul loads AddonPrefs after preferencesBindings.js, before Preferences.js.
 
 ### Version 2.1.6
 * Move `createSelectionList` into DuplicateEntriesWindowUI; main window delegates.

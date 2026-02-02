@@ -1,3 +1,4 @@
+// Opens duplicate-finder window via Launcher adapter (insulates window.open for TB128 port).
 var DuplicateContactsManager = {
 	manageDuplicatesIsRunning: false,
 	menuButtonAction: function() {
@@ -5,7 +6,6 @@ var DuplicateContactsManager = {
 	},
 	manageDuplicates: function() {
 		this.manageDuplicatesIsRunning = true;
-		var dupwindow = window.open('chrome://duplicatecontactsmanager/content/duplicateEntriesWindow.xul', "Duplicate Contacts Manager", "chrome,centerscreen");
-		dupwindow.focus();
+		DuplicateContactsManagerLauncher.openDuplicatesWindow();
 	}
-}
+};

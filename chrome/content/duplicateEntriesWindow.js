@@ -76,33 +76,19 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 				this.statustext.textContent = this.getString("NoABookFound");
 				return;
 			}
+			// Default address book: use selected directory from opener (Address Book UI) if available.
+			var listInfo = DuplicateEntriesWindowContacts.getAddressBookList(this.abManager);
 			if (this.abURI1 == null || this.abURI2 == null) {
-				var default_abook = this.abManager.directories.getNext().URI;
-				if (typeof window.opener.GetSelectedDirectory != 'undefined') {
-					const addressbookURIs = window.opener.GetSelectedDirectory().
-				                                match(/(moz-ab(mdb|osx)directory:\/\/([^\/]+\.mab|\/)).*/);
-					if (addressbookURIs && addressbookURIs.length > 0)
-						default_abook = addressbookURIs[1];
-				}
+				var default_abook = (listInfo.URIs.length > 0) ? listInfo.URIs[0] : null;
+				var selectedUri = DuplicateEntriesWindowContacts.getSelectedDirectoryFromOpener();
+				if (selectedUri && listInfo.URIs.indexOf(selectedUri) !== -1)
+					default_abook = selectedUri;
 				this.abURI1 = this.abURI2 = default_abook;
 			}
-
-			// We will process the first/selected address book, plus optionally a second one
-			// read all addressbooks, fill lists in preferences dialog
-			var allAddressBooks = this.abManager.directories;
-			var dirNames = new Array();
-			var URIs = new Array();
-			while (allAddressBooks.hasMoreElements()) {
-				var addressBook = allAddressBooks.getNext();
-				if (addressBook instanceof Components.interfaces.nsIAbDirectory)
-				{
-					dirNames.push(addressBook.dirName);
-					URIs    .push(addressBook.URI);
-				}
-			}
+			// Fill address book dropdowns from Contacts adapter (insulates directory enumeration).
 			var ablists = document.getElementById('addressbooklists');
-			var ablist1 = this.createSelectionList('addressbookname', dirNames, URIs, this.abURI1);
-			var ablist2 = this.createSelectionList('addressbookname', dirNames, URIs, this.abURI2);
+			var ablist1 = this.createSelectionList('addressbookname', listInfo.dirNames, listInfo.URIs, this.abURI1);
+			var ablist2 = this.createSelectionList('addressbookname', listInfo.dirNames, listInfo.URIs, this.abURI2);
 			ablists.appendChild(ablist1);
 			ablists.appendChild(ablist2);
 

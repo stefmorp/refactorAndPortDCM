@@ -4,6 +4,7 @@
 // Read/write logic for Thunderbird address book contacts (cards and directories).
 // Insulates callers from card type: getAllAbCards returns wrapped cards (getProperty, setProperty, getPropertyNames, getRawCard);
 // only this module touches nsIAbCard; TB128 can wrap a different contact type without changing CardValues/Comparison.
+// Insulates directory listing: getAddressBookList(abManager), getSelectedDirectoryFromOpener() (legacy: directories enum, window.opener; TB128 may differ).
 // Used by duplicateEntriesWindow.js. Load this script before duplicateEntriesWindow.js.
 
 /*
@@ -56,6 +57,44 @@ var DuplicateEntriesWindowContacts = (function() {
 	 */
 	function getDirectory(uri) {
 		return getAbManager().getDirectory(uri);
+	}
+
+	/**
+	 * Returns a list of all address book directories for building dropdowns.
+	 * Insulates callers from nsIAbManager.directories enumeration (legacy: hasMoreElements/getNext; TB128 may differ).
+	 * @param {nsIAbManager} abManager - From getAbManager()
+	 * @returns {{ dirNames: string[], URIs: string[] }}
+	 */
+	function getAddressBookList(abManager) {
+		var dirNames = [];
+		var URIs = [];
+		if (!abManager || !abManager.directories)
+			return { dirNames: dirNames, URIs: URIs };
+		var allDirs = abManager.directories;
+		while (allDirs.hasMoreElements()) {
+			var dir = allDirs.getNext();
+			if (dir instanceof Components.interfaces.nsIAbDirectory) {
+				dirNames.push(dir.dirName);
+				URIs.push(dir.URI);
+			}
+		}
+		return { dirNames: dirNames, URIs: URIs };
+	}
+
+	/**
+	 * Returns the selected address book URI from the opener window when opened from the Address Book UI.
+	 * Legacy: window.opener.GetSelectedDirectory(); TB128 may use a different API or messaging.
+	 * @returns {string|null} URI of the selected directory, or null if not available.
+	 */
+	function getSelectedDirectoryFromOpener() {
+		if (typeof window === "undefined" || !window.opener || typeof window.opener.GetSelectedDirectory !== "function")
+			return null;
+		var raw = window.opener.GetSelectedDirectory();
+		if (!raw || typeof raw !== "string")
+			return null;
+		// Full URI is match[0]; legacy code used match[1] (mdb|osx) by mistake.
+		var match = raw.match(/(moz-ab(mdb|osx)directory:\/\/([^\/]+\.mab|\/)).*/);
+		return (match && match[0]) ? match[0] : null;
 	}
 
 	/**
@@ -149,6 +188,8 @@ var DuplicateEntriesWindowContacts = (function() {
 	return {
 		getAbManager: getAbManager,
 		getDirectory: getDirectory,
+		getAddressBookList: getAddressBookList,
+		getSelectedDirectoryFromOpener: getSelectedDirectoryFromOpener,
 		getAllAbCards: getAllAbCards,
 		getCardProperty: getCardProperty,
 		setCardProperty: setCardProperty,
