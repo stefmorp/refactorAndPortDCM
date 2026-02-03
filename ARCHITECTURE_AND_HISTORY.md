@@ -233,6 +233,14 @@ These adapters keep the rest of the add-on independent of platform APIs that may
 
 ## Change history
 
+### Version 2.2.0 (TB128 port)
+* **Port to Thunderbird 128 (WebExtensions/MV3):** Single codebase with runtime detection; same JS modules run in legacy (XUL) and TB128 (HTML) contexts.
+* **Manifest:** `manifest-tb128.json` for TB128 (MV3, background script, options_ui, permissions: addressBooks, storage, menus). Legacy build continues to use install.rdf + chrome.manifest + manifest.json with legacy type.
+* **Background:** `background.js` registers Tools menu and opens duplicate-finder via Launcher; Launcher uses `browser.windows.create` in TB128.
+* **Adapters (TB128 branches):** Strings → `browser.i18n.getMessage`; Prefs → `browser.storage.local`; Contacts → `messenger.addressBooks.list()`, `messenger.contacts.list/get/update/delete` with wrapped contact interface; Widgets → HTML elements (select, div, span, input, img, tr); AddonPrefs → no-op (options use storage).
+* **Async:** init(), startSearch(), readAddressBooks(), updateAbCard(), deleteAbCard(), applyAndSearchNextDuplicate(), keepAndSearchNextDuplicate() are async; getAddressBookList() and getAllAbCards() return Promises (legacy: Promise.resolve(sync)); runIntervalAction() async to await deleteAbCard.
+* **UI:** `duplicateEntriesWindow.html` hosts the duplicate-finder with same element IDs; `options.html` + `options-tb128.js` for TB128 options; `_locales/en/messages.json` for i18n; UI/Prefs compat for HTML (.textContent, .checked, button label).
+
 ### Version 2.1.7 (insulation for TB128)
 * **Launcher adapter:** duplicateContactsManagerLauncher.js — open duplicate-finder window via `openDuplicatesWindow()`; duplicateContactsManager.js no longer calls `window.open` directly. Overlays load Launcher before duplicateContactsManager.js.
 * **Address book list adapter:** DuplicateEntriesWindowContacts.getAddressBookList(abManager) and getSelectedDirectoryFromOpener(); main window init uses these instead of enumerating abManager.directories or calling window.opener.GetSelectedDirectory. Fix: selected-directory regex returns full URI (match[0]) instead of match[1].

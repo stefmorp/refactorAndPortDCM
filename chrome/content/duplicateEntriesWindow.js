@@ -35,9 +35,10 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		},
 
 		/**
-		 * Will be called by duplicateEntriesWindow.xul once the according window is loaded
+		 * Will be called by duplicateEntriesWindow.xul (or .html in TB128) once the window is loaded.
+		 * Async so it can await loadPrefs and getAddressBookList when using TB128 adapters.
 		 */
-		init: function() {
+		init: async function() {
 			var F = DuplicateEntriesWindowFields;
 			this.addressBookFields = F.addressBookFields;
 			this.matchablesList = F.matchablesList;
@@ -55,7 +56,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 
 			this.abManager = DuplicateEntriesWindowContacts.getAbManager();
 			this.prefsBranch = DuplicateEntriesWindowPrefs.getPrefsBranch();
-			DuplicateEntriesWindowPrefs.loadPrefs(this);
+			await DuplicateEntriesWindowPrefs.loadPrefs(this);
 			DuplicateEntriesWindowPrefs.applyPrefsToDOM(this);
 
 			this.getString = DuplicateEntriesWindowStrings.createStringProvider(this);
@@ -67,35 +68,38 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			this.attributesTableRows = document.getElementById('AttributesTableRows');
 			this.keepLeftRadioButton = document.getElementById('keepLeft');
 			this.keepRightRadioButton = document.getElementById('keepRight');
-			this.progresstext.value = "";
+			if (this.progresstext) this.progresstext.value = this.progresstext.value || "";
 			DuplicateEntriesWindowUI.showReadyState(this);
 
-			if (!this.abManager || !this.abManager.directories || this.abManager.directories.length == 0) {
+			var listInfo = await DuplicateEntriesWindowContacts.getAddressBookList(this.abManager);
+			/* No address books: listInfo is always set (from getAddressBookList); check URIs length. */
+			if (!listInfo || !listInfo.URIs || listInfo.URIs.length === 0) {
 				this.disable('startbutton');
-				this.statustext.className = 'error-message'; /* not 'with-progress' */
+				this.statustext.className = 'error-message';
 				this.statustext.textContent = this.getString("NoABookFound");
 				return;
 			}
-			// Default address book: use selected directory from opener (Address Book UI) if available.
-			var listInfo = DuplicateEntriesWindowContacts.getAddressBookList(this.abManager);
 			if (this.abURI1 == null || this.abURI2 == null) {
-				var default_abook = (listInfo.URIs.length > 0) ? listInfo.URIs[0] : null;
+				var default_abook = listInfo.URIs[0] || null;
 				var selectedUri = DuplicateEntriesWindowContacts.getSelectedDirectoryFromOpener();
 				if (selectedUri && listInfo.URIs.indexOf(selectedUri) !== -1)
 					default_abook = selectedUri;
 				this.abURI1 = this.abURI2 = default_abook;
 			}
-			// Fill address book dropdowns from Contacts adapter (insulates directory enumeration).
 			var ablists = document.getElementById('addressbooklists');
 			var ablist1 = this.createSelectionList('addressbookname', listInfo.dirNames, listInfo.URIs, this.abURI1);
 			var ablist2 = this.createSelectionList('addressbookname', listInfo.dirNames, listInfo.URIs, this.abURI2);
 			ablists.appendChild(ablist1);
 			ablists.appendChild(ablist2);
 
-			this.statustext.className = ''; /* not 'with-progress' */
+			this.statustext.className = '';
 			this.statustext.textContent = this.getString('PleasePressStart');
-			document.getElementById('startbutton').setAttribute('label', this.getString('Start'));
-			document.getElementById('startbutton').focus();
+			var startBtn = document.getElementById('startbutton');
+			if (startBtn) {
+				startBtn.setAttribute('label', this.getString('Start'));
+				if (startBtn.tagName === 'BUTTON') startBtn.textContent = this.getString('Start');
+				startBtn.focus();
+			}
 		},
 
 		/**
@@ -108,7 +112,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			this.vcards[this.BOOK_2] = null;
 		},
 
-		startSearch: function() {
+		startSearch: async function() {
 			if (this.restart) {
 				this.restart = false;
 				this.init();
@@ -123,10 +127,9 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 				this.abURI2 = ab2.selectedItem.value;
 			this.abDir1 = this.abManager.getDirectory(this.abURI1);
 			this.abDir2 = this.abManager.getDirectory(this.abURI2);
-			if([this.abURI1, this.abURI2].includes("moz-abosxdirectory:///"))
+			if ([this.abURI1, this.abURI2].includes("moz-abosxdirectory:///"))
 				alert("Mac OS X Address Book is read-only.\nYou can use it only for comparison.");
-			//It seems that Thunderbird 11 on Max OS 10.7 can actually be write fields, although an exception is thrown.
-			this.readAddressBooks();
+			await this.readAddressBooks();
 
 			DuplicateEntriesWindowPrefs.readPrefsFromDOM(this);
 			if (this.natTrunkPrefix != "" && !this.natTrunkPrefix.match(/^[0-9]{1,2}$/))
@@ -135,14 +138,16 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 				alert("International call prefix '"+this.intCallPrefix+"' should contain two to four digits");
 			if (this.countryCallingCode != "" && !this.countryCallingCode.match(/^(\+|[0-9])[0-9]{1,6}$/))
 				alert("Default country calling code '"+this.countryCallingCode+"' should contain a leading '+' or digit followed by one to six digits");
-			DuplicateEntriesWindowPrefs.savePrefs(this);
+			await DuplicateEntriesWindowPrefs.savePrefs(this);
 
 			this.purgeAttributesTable();
 			DuplicateEntriesWindowUI.showSearchingState(this);
 			this.statustext.className = 'with-progress';
 			this.statustext.textContent = this.getString('SearchingForDuplicates');
-			document.getElementById('statusAddressBook1_label').value = this.abDir1.dirName;
-			document.getElementById('statusAddressBook2_label').value = this.abDir2.dirName;
+			var el1 = document.getElementById('statusAddressBook1_label');
+			if (el1) { if (el1.value !== undefined) el1.value = this.abDir1.dirName; el1.textContent = this.abDir1.dirName; }
+			var el2 = document.getElementById('statusAddressBook2_label');
+			if (el2) { if (el2.value !== undefined) el2.value = this.abDir2.dirName; el2.textContent = this.abDir2.dirName; }
 			this.updateDeletedInfo('statusAddressBook1_size' , this.BOOK_1, 0);
 			this.updateDeletedInfo('statusAddressBook2_size' , this.BOOK_2, 0);
 
@@ -189,29 +194,25 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 		/**
 		 * Saves modifications to one card and deletes the other one.
 		 */
-		applyAndSearchNextDuplicate: function() {
-			// for the case that right one will be kept
+		applyAndSearchNextDuplicate: async function() {
 			var [deleAbDir, deleBook, deleIndex] = [this.abDir1, this.BOOK_1, this.position1];
 			var [keptAbDir, keptBook, keptIndex] = [this.abDir2, this.BOOK_2, this.position2];
-			if (this.sideKept == 'left') { // left one will be kept
+			if (this.sideKept == 'left') {
 				[deleAbDir, deleBook, deleIndex, keptAbDir, keptBook, keptIndex] =
 				[keptAbDir, keptBook, keptIndex, deleAbDir, deleBook, deleIndex];
 			}
-			this.updateAbCard(keptAbDir, keptBook, keptIndex, this.sideKept);
-			this.deleteAbCard(deleAbDir, deleBook, deleIndex, false);
+			await this.updateAbCard(keptAbDir, keptBook, keptIndex, this.sideKept);
+			await this.deleteAbCard(deleAbDir, deleBook, deleIndex, false);
 			this.searchNextDuplicate();
 		},
 
-		updateAbCard: function(abDir, book, index, side) {
-			var card = this.vcards[book][index];  /* wrapped (getProperty, setProperty) from Contacts */
-
-			// see what's been modified
+		updateAbCard: async function(abDir, book, index, side) {
+			var card = this.vcards[book][index];
 			var updateFields = this.getCardFieldValues(side);
 			var entryModified = false;
-			for(let property in updateFields) {
-				const defaultValue = this.defaultValue(property); /* cannot be a set here */
+			for (var property in updateFields) {
+				var defaultValue = this.defaultValue(property);
 				if (card.getProperty(property, defaultValue) != updateFields[property]) {
-				// not using this.getProperty here to give a chance to update wrongly empty field
 					try {
 						card.setProperty(property, updateFields[property]);
 						entryModified = true;
@@ -222,9 +223,9 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 				}
 			}
 			if (entryModified) {
-				this.vcardsSimplified[book][index] = null; // request reconstruction by getSimplifiedCard
+				this.vcardsSimplified[book][index] = null;
 				try {
-					DuplicateEntriesWindowContacts.saveCard(abDir, card);
+					await DuplicateEntriesWindowContacts.saveCard(abDir, card);
 					this.totalCardsChanged++;
 				} catch (e) {
 					var nameForError = card.getProperty ? card.getProperty('DisplayName', '') : (card.displayName || '');
@@ -233,22 +234,16 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			}
 		},
 
-		/**
-		 * Saves modifications to both cards
-		 */
-		keepAndSearchNextDuplicate: function() {
-			this.updateAbCard(this.abDir1, this.BOOK_1, this.position1, 'left' );
-			this.updateAbCard(this.abDir2, this.BOOK_2, this.position2, 'right');
+		keepAndSearchNextDuplicate: async function() {
+			await this.updateAbCard(this.abDir1, this.BOOK_1, this.position1, 'left');
+			await this.updateAbCard(this.abDir2, this.BOOK_2, this.position2, 'right');
 			this.searchNextDuplicate();
 		},
 
-		/**
-		 * Deletes the card identified by 'index' from the given address book.
-		 */
-		deleteAbCard: function(abDir, book, index, auto) {
-			var card = this.vcards[book][index];  /* wrapped from Contacts; save/delete use getRawCard() */
+		deleteAbCard: async function(abDir, book, index, auto) {
+			var card = this.vcards[book][index];
 			try {
-				DuplicateEntriesWindowContacts.deleteCard(abDir, card);
+				await DuplicateEntriesWindowContacts.deleteCard(abDir, card);
 				if (abDir == this.abDir1)
 					this.totalCardsDeleted1++;
 				else
@@ -259,7 +254,7 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 				var nameForError = card.getProperty ? card.getProperty('DisplayName', '') : (card.displayName || '');
 				alert("Internal error: cannot remove card '"+nameForError+"': "+e);
 			}
-			this.vcards[book][index] = null; // set empty element, but leave element number as is
+			this.vcards[book][index] = null;
 		},
 
 		updateDeletedInfo: function(label, book, nDeleted) {
@@ -320,18 +315,18 @@ if (typeof(DuplicateContactsManager_Running) == "undefined") {
 			DuplicateEntriesWindowCardValues.enrichCardForComparison(this, card, mailLists);
 		},
 
-		readAddressBooks: function() {
+		readAddressBooks: async function() {
 			var Contacts = DuplicateEntriesWindowContacts;
 			if (!this.abDir1.isMailList) {
-				var result1 = Contacts.getAllAbCards(this.abDir1, this);  /* cards are wrapped */
+				var result1 = await Contacts.getAllAbCards(this.abDir1, this);
 				this.vcards[this.BOOK_1] = result1.cards;
-				this.vcardsSimplified[this.BOOK_1] = new Array();
+				this.vcardsSimplified[this.BOOK_1] = [];
 				this.totalCardsBefore = result1.totalBefore;
 			}
 			if (this.abDir2 != this.abDir1 && !this.abDir2.isMailList) {
-				var result2 = Contacts.getAllAbCards(this.abDir2, this);
+				var result2 = await Contacts.getAllAbCards(this.abDir2, this);
 				this.vcards[this.BOOK_2] = result2.cards;
-				this.vcardsSimplified[this.BOOK_2] = new Array();
+				this.vcardsSimplified[this.BOOK_2] = [];
 				this.totalCardsBefore += result2.totalBefore;
 			} else {
 				this.vcards[this.BOOK_2] = this.vcards[this.BOOK_1];

@@ -12,10 +12,11 @@ var DuplicateEntriesWindowPrefs = (function() {
 	"use strict";
 
 	var PREF_BRANCH_ID = "extensions.DuplicateContactsManager.";
+	var STORAGE_PREFIX = "DuplicateContactsManager.";
+	var isTB128 = (typeof browser !== "undefined" && browser.storage && browser.storage.local);
 
 	/**
-	 * Legacy prefs backend: wraps nsIPrefBranch. Same interface can be implemented
-	 * by a WebExt backend (e.g. browser.storage) for TB128 without changing callers.
+	 * Legacy prefs backend: wraps nsIPrefBranch.
 	 * Backend interface: getBoolPref(name), getCharPref(name), setBoolPref(name, value), setCharPref(name, value).
 	 */
 	function createLegacyBackend() {
@@ -35,19 +36,57 @@ var DuplicateEntriesWindowPrefs = (function() {
 	}
 
 	/**
-	 * Returns the prefs backend for the duplicate-entries window. Stored on ctx as ctx.prefsBranch.
-	 * Legacy: nsIPrefBranch wrapper. TB128: can return a backend that uses browser.storage.
+	 * TB128: backend using browser.storage.local. Methods return Promises.
+	 * Missing keys: getBoolPref returns false, getCharPref returns "" (caller keeps State defaults on first run).
+	 */
+	function createStorageBackend() {
+		var storage = browser.storage.local;
+		function key(name) { return STORAGE_PREFIX + name; }
+		return {
+			getBoolPref: function(name) {
+				return storage.get(key(name)).then(function(o) { return o[key(name)] === true; });
+			},
+			getCharPref: function(name) {
+				return storage.get(key(name)).then(function(o) { var v = o[key(name)]; return (v != null && v !== "") ? v : ""; });
+			},
+			setBoolPref: function(name, value) {
+				var o = {}; o[key(name)] = !!value; return storage.set(o);
+			},
+			setCharPref: function(name, value) {
+				var o = {}; o[key(name)] = (value != null) ? String(value) : ""; return storage.set(o);
+			}
+		};
+	}
+
+	/**
+	 * Returns the prefs backend. Legacy: nsIPrefBranch wrapper. TB128: browser.storage.local backend.
 	 */
 	function getPrefsBranch() {
+		if (isTB128)
+			return createStorageBackend();
 		return createLegacyBackend();
 	}
 
 	/**
-	 * Reads preference values from ctx.prefsBranch into ctx. Sets RegExps from prefix strings.
+	 * Reads preference values from ctx.prefsBranch into ctx. Returns Promise so init can await (TB128 async; legacy sync wrapped).
 	 */
 	function loadPrefs(ctx) {
-		if (!ctx.prefsBranch)
-			return;
+		if (!ctx.prefsBranch) return Promise.resolve();
+		if (isTB128) {
+			return ctx.prefsBranch.getBoolPref('autoremoveDups').then(function(v) { ctx.autoremoveDups = v; })
+				.then(function() { return ctx.prefsBranch.getBoolPref('preserveFirst'); }).then(function(v) { ctx.preserveFirst = v; })
+				.then(function() { return ctx.prefsBranch.getBoolPref('deferInteractive'); }).then(function(v) { ctx.deferInteractive = v; })
+				.then(function() { return ctx.prefsBranch.getCharPref('natTrunkPrefix'); }).then(function(v) { ctx.natTrunkPrefix = v || ""; ctx.natTrunkPrefixReqExp = new RegExp("^" + (v || "") + "([1-9])"); })
+				.then(function() { return ctx.prefsBranch.getCharPref('intCallPrefix'); }).then(function(v) { ctx.intCallPrefix = v || ""; ctx.intCallPrefixReqExp = new RegExp("^" + (v || "") + "([1-9])"); })
+				.then(function() { return ctx.prefsBranch.getCharPref('countryCallingCode'); }).then(function(v) { ctx.countryCallingCode = v || ""; })
+				.then(function() {
+					ctx.ignoredFields = ctx.ignoredFieldsDefault.slice();
+					return ctx.prefsBranch.getCharPref('ignoreFields');
+				}).then(function(prefStringValue) {
+					if (prefStringValue && prefStringValue.length > 0)
+						ctx.ignoredFields = prefStringValue.split(/\s*,\s*/);
+				});
+		}
 		try {
 			ctx.autoremoveDups = ctx.prefsBranch.getBoolPref('autoremoveDups');
 		} catch (e) {}
@@ -74,15 +113,17 @@ var DuplicateEntriesWindowPrefs = (function() {
 			if (prefStringValue.length > 0)
 				ctx.ignoredFields = prefStringValue.split(/\s*,\s*/);
 		} catch (e) {}
+		return Promise.resolve();
 	}
 
 	/**
-	 * Writes ctx preference values to the options form elements.
+	 * Writes ctx preference values to the options form elements. (HTML: .checked; XUL: .checked or setAttribute.)
 	 */
 	function applyPrefsToDOM(ctx) {
-		document.getElementById('autoremove').checked = ctx.autoremoveDups;
-		document.getElementById('preservefirst').checked = ctx.preserveFirst;
-		document.getElementById('deferInteractive').checked = ctx.deferInteractive;
+		var el;
+		el = document.getElementById('autoremove'); if (el) { el.checked = ctx.autoremoveDups; if (el.setAttribute) el.setAttribute('checked', ctx.autoremoveDups ? 'true' : ''); }
+		el = document.getElementById('preservefirst'); if (el) { el.checked = ctx.preserveFirst; if (el.setAttribute) el.setAttribute('checked', ctx.preserveFirst ? 'true' : ''); }
+		el = document.getElementById('deferInteractive'); if (el) { el.checked = ctx.deferInteractive; if (el.setAttribute) el.setAttribute('checked', ctx.deferInteractive ? 'true' : ''); }
 		document.getElementById('natTrunkPrefix').value = ctx.natTrunkPrefix;
 		document.getElementById('intCallPrefix').value = ctx.intCallPrefix;
 		document.getElementById('countryCallingCode').value = ctx.countryCallingCode;
@@ -94,12 +135,13 @@ var DuplicateEntriesWindowPrefs = (function() {
 
 	/**
 	 * Reads current values from the options form into ctx.
-	 * Note: getAttribute('checked') returns string "true" or attribute value; setBoolPref accepts it.
+	 * HTML: use .checked (boolean); XUL: getAttribute('checked') for legacy setBoolPref.
 	 */
 	function readPrefsFromDOM(ctx) {
-		ctx.autoremoveDups = document.getElementById('autoremove').getAttribute('checked');
-		ctx.preserveFirst = document.getElementById('preservefirst').getAttribute('checked');
-		ctx.deferInteractive = document.getElementById('deferInteractive').getAttribute('checked');
+		var el;
+		el = document.getElementById('autoremove'); ctx.autoremoveDups = (el && (el.checked === true || el.getAttribute('checked') === 'true'));
+		el = document.getElementById('preservefirst'); ctx.preserveFirst = (el && (el.checked === true || el.getAttribute('checked') === 'true'));
+		el = document.getElementById('deferInteractive'); ctx.deferInteractive = (el && (el.checked === true || el.getAttribute('checked') === 'true'));
 		ctx.natTrunkPrefix = document.getElementById('natTrunkPrefix').value;
 		ctx.intCallPrefix = document.getElementById('intCallPrefix').value;
 		ctx.countryCallingCode = document.getElementById('countryCallingCode').value;
@@ -110,11 +152,19 @@ var DuplicateEntriesWindowPrefs = (function() {
 	}
 
 	/**
-	 * Writes ctx preference values to the prefs branch.
+	 * Writes ctx preference values to the prefs branch. Returns Promise (TB128 async; legacy sync wrapped).
 	 */
 	function savePrefs(ctx) {
-		if (!ctx.prefsBranch)
-			return;
+		if (!ctx.prefsBranch) return Promise.resolve();
+		if (isTB128) {
+			return ctx.prefsBranch.setBoolPref('autoremoveDups', ctx.autoremoveDups)
+				.then(function() { return ctx.prefsBranch.setBoolPref('preserveFirst', ctx.preserveFirst); })
+				.then(function() { return ctx.prefsBranch.setBoolPref('deferInteractive', ctx.deferInteractive); })
+				.then(function() { return ctx.prefsBranch.setCharPref('natTrunkPrefix', ctx.natTrunkPrefix); })
+				.then(function() { return ctx.prefsBranch.setCharPref('intCallPrefix', ctx.intCallPrefix); })
+				.then(function() { return ctx.prefsBranch.setCharPref('countryCallingCode', ctx.countryCallingCode); })
+				.then(function() { return ctx.prefsBranch.setCharPref('ignoreFields', ctx.ignoredFields.join(", ")); });
+		}
 		ctx.prefsBranch.setBoolPref('autoremoveDups', ctx.autoremoveDups);
 		ctx.prefsBranch.setBoolPref('preserveFirst', ctx.preserveFirst);
 		ctx.prefsBranch.setBoolPref('deferInteractive', ctx.deferInteractive);
@@ -122,6 +172,7 @@ var DuplicateEntriesWindowPrefs = (function() {
 		ctx.prefsBranch.setCharPref('intCallPrefix', ctx.intCallPrefix);
 		ctx.prefsBranch.setCharPref('countryCallingCode', ctx.countryCallingCode);
 		ctx.prefsBranch.setCharPref('ignoreFields', ctx.ignoredFields.join(", "));
+		return Promise.resolve();
 	}
 
 	return {

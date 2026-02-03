@@ -58,16 +58,12 @@ var DuplicateEntriesWindowSearch = (function() {
 	}
 
 	/**
-	 * Performs the actual search loop. Called via setTimeout from the main window's searchNextDuplicate.
-	 * Runs until a duplicate is found (then shows UI and returns), or 1s has elapsed (then re-schedules itself), or search ends (calls ctx.endSearch()).
+	 * Performs the actual search loop. Async so it can await ctx.deleteAbCard when Contacts are async (TB128).
 	 */
-	function runIntervalAction(ctx) {
+	async function runIntervalAction(ctx) {
 		var lasttime = new Date();
 		while (skipPositionsToNext(ctx)) {
 			if ((new Date()) - lasttime >= 1000) {
-				// Force/enable Thunderbird every 1000 milliseconds to redraw the progress bar etc.
-				// See also http://stackoverflow.com/questions/2592335/how-to-report-progress-of-a-javascript-function
-				// As a nice side effect, this allows the stop button to take effect while this main loop is active!
 				setTimeout(function() { DuplicateEntriesWindowSearch.runIntervalAction(ctx); }, 13);
 				return;
 			}
@@ -93,9 +89,9 @@ var DuplicateEntriesWindowSearch = (function() {
 				if (comparison != -2 && ctx.autoremoveDups &&
 				    !(ctx.abDir1 != ctx.abDir2 && ctx.preserveFirst && preference < 0)) {
 					if (preference < 0)
-						ctx.deleteAbCard(ctx.abDir1, ctx.BOOK_1, ctx.position1, true);
+						await ctx.deleteAbCard(ctx.abDir1, ctx.BOOK_1, ctx.position1, true);
 					else
-						ctx.deleteAbCard(ctx.abDir2, ctx.BOOK_2, ctx.position2, true);
+						await ctx.deleteAbCard(ctx.abDir2, ctx.BOOK_2, ctx.position2, true);
 				} else {
 					if (ctx.deferInteractive && !ctx.nowHandling) {
 						ctx.duplicates.push([ctx.position1, ctx.position2]);

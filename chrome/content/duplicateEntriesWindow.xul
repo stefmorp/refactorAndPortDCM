@@ -8,7 +8,7 @@
     title="&handleDuplicates.windowtitle;"
 	xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
 	xmlns:html="http://www.w3.org/1999/xhtml"
-	onload="DuplicateEntriesWindow.init()"
+	onload="DuplicateEntriesWindow.init().catch(function(e){console.error(e);})"
 	onunload="DuplicateEntriesWindow.OnUnloadWindow()">
 	<!-- Script load order is required: see ARCHITECTURE_AND_HISTORY.md. -->
 	<script type="application/x-javascript" src="chrome://duplicatecontactsmanager/content/duplicateEntriesWindowState.js"/>

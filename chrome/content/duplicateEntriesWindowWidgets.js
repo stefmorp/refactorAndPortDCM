@@ -10,26 +10,36 @@
 var DuplicateEntriesWindowWidgets = (function() {
 	"use strict";
 
+	var isTB128 = (typeof messenger !== "undefined" && messenger.addressBooks);
+
 	/**
-	 * Creates a dropdown (menulist + menupopup + menuitems). Legacy: XUL; TB128: <select> + <option>.
-	 * @param {string|null} cls - Optional class name for menulist and menupopup
-	 * @param {string[]} labels - Display labels for each option
-	 * @param {any[]} values - Values for each option (stored as attribute 'value')
-	 * @param {any} selected - Value that should be selected
-	 * @returns {Element} The dropdown element (menulist or select)
+	 * Creates a dropdown. Legacy: XUL menulist; TB128: HTML select. Callers use .selectedItem.value; we expose that on both.
 	 */
 	function createSelectionList(cls, labels, values, selected) {
+		if (isTB128) {
+			var select = document.createElement('select');
+			if (cls) select.className = cls;
+			for (var i = 0; i < labels.length; i++) {
+				var opt = document.createElement('option');
+				opt.textContent = labels[i];
+				opt.value = values[i];
+				if (values[i] == selected) opt.selected = true;
+				select.appendChild(opt);
+			}
+			Object.defineProperty(select, 'selectedItem', {
+				get: function() { var o = this.options[this.selectedIndex]; return o ? { value: o.value } : null; },
+				configurable: true
+			});
+			return select;
+		}
 		var menulist = document.createElement('menulist');
-		if (cls != null)
-			menulist.setAttribute('class', cls);
+		if (cls != null) menulist.setAttribute('class', cls);
 		var menupopup = document.createElement('menupopup');
-		if (cls != null)
-			menupopup.setAttribute('class', cls);
+		if (cls != null) menupopup.setAttribute('class', cls);
 		for (var i = 0; i < labels.length; i++) {
 			var menuitem = document.createElement('menuitem');
 			menuitem.setAttribute('crop', 'end');
-			if (cls != null)
-				menuitem.setAttribute('class', cls);
+			if (cls != null) menuitem.setAttribute('class', cls);
 			menuitem.setAttribute('label', labels[i]);
 			menuitem.setAttribute('value', values[i]);
 			if (values[i] == selected) {
@@ -42,33 +52,36 @@ var DuplicateEntriesWindowWidgets = (function() {
 		return menulist;
 	}
 
-	/** Creates a horizontal container. Legacy: hbox; TB128: div with flex/display. */
 	function createHbox() {
+		if (isTB128) { var d = document.createElement('div'); d.className = 'hbox'; d.style.display = 'flex'; return d; }
 		return document.createElement('hbox');
 	}
 
-	/** Creates a text/description element. Legacy: description; TB128: span or div. */
 	function createDescription() {
+		if (isTB128) return document.createElement('span');
 		return document.createElement('description');
 	}
 
-	/** Creates a label element. Legacy: label; TB128: label or span. */
+	/** Label element; same tag in XUL and HTML. */
 	function createLabel() {
 		return document.createElement('label');
 	}
 
-	/** Creates a single-line or multiline text input. Legacy: textbox; TB128: input or textarea. */
+	/** Single-line input. TB128: input; legacy: XUL textbox. */
 	function createTextbox() {
+		if (isTB128) return document.createElement('input');
 		return document.createElement('textbox');
 	}
 
-	/** Creates an image element. Legacy: image; TB128: img. */
+	/** Image. TB128: img; legacy: XUL image. */
 	function createImage() {
+		if (isTB128) return document.createElement('img');
 		return document.createElement('image');
 	}
 
-	/** Creates a table row. Legacy: row; TB128: tr or div. */
+	/** Table row. TB128: tr; legacy: XUL row. */
 	function createRow() {
+		if (isTB128) return document.createElement('tr');
 		return document.createElement('row');
 	}
 

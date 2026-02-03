@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Duplicate Contacts Manager",
+  "description": "Find and manage duplicate contacts in Thunderbird address books.",
+  "version": "2.2.0",
+  "author": "Marian Steinbach, David von Oheimb, et al.",
+  "homepage_url": "https://github.com/DDvO/Duplicate-Contacts-Manager",
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "duplicateContactsManager@ddvo.net",
+      "strict_min_version": "128.0"
+    }
+  },
+
+  "permissions": [
+    "addressBooks",
+    "storage",
+    "menus"
+  ],
+
+  "background": {
+    "scripts": [
+      "chrome/content/duplicateContactsManagerLauncher.js",
+      "chrome/content/duplicateContactsManager.js",
+      "chrome/content/background.js"
+    ]
+  },
+
+  "icons": {
+    "64": "chrome/content/kate.png"
+  },
+
+  "options_ui": {
+    "page": "chrome/content/options.html",
+    "open_in_tab": false
+  }
+}

@@ -17,10 +17,12 @@ var DuplicateEntriesWindowContacts = (function() {
 	"use strict";
 
 	var abManager = null;
+	var cachedListInfo = null; /* TB128: cache for getDirectory dirName lookup */
+
+	var isTB128 = (typeof messenger !== "undefined" && messenger.addressBooks);
 
 	/**
-	 * Stable card interface for insulation: getProperty(name, default), setProperty(name, value),
-	 * getPropertyNames(), getRawCard(). Legacy wraps nsIAbCard; TB128 can wrap a different type.
+	 * Stable card interface. Legacy wraps nsIAbCard; TB128 wraps contact from messenger.addressBooks.contacts.
 	 */
 	function wrapCard(abCard) {
 		return {
@@ -42,7 +44,22 @@ var DuplicateEntriesWindowContacts = (function() {
 		};
 	}
 
+	/** TB128: wrap contact from messenger.contacts (id, properties). */
+	function wrapTB128Contact(contact, parentId) {
+		var props = contact.properties || {};
+		return {
+			_contact: contact,
+			_parentId: parentId,
+			getProperty: function(name, defaultValue) { return (props[name] !== undefined && props[name] !== null && props[name] !== "") ? props[name] : defaultValue; },
+			setProperty: function(name, value) { props[name] = value; },
+			getPropertyNames: function() { return Object.keys(props); },
+			getRawCard: function() { return this._contact; }
+		};
+	}
+
 	function getAbManager() {
+		if (isTB128)
+			return { list: function() { return messenger.addressBooks.list(); } };
 		if (!abManager) {
 			abManager = Components.classes["@mozilla.org/abmanager;1"]
 				.getService(Components.interfaces.nsIAbManager);
@@ -51,25 +68,43 @@ var DuplicateEntriesWindowContacts = (function() {
 	}
 
 	/**
-	 * Returns the address book directory for the given URI.
-	 * @param {string} uri - Address book URI (e.g. moz-abmdbdirectory://...)
-	 * @returns {nsIAbDirectory}
+	 * Returns the address book directory for the given URI (legacy: nsIAbDirectory; TB128: facade with id, dirName, isMailList).
 	 */
 	function getDirectory(uri) {
+		if (isTB128) {
+			var dirName = uri;
+			if (cachedListInfo && cachedListInfo.URIs) {
+				var idx = cachedListInfo.URIs.indexOf(uri);
+				if (idx >= 0 && cachedListInfo.dirNames[idx]) dirName = cachedListInfo.dirNames[idx];
+			}
+			return { id: uri, dirName: dirName, isMailList: false };
+		}
 		return getAbManager().getDirectory(uri);
 	}
 
 	/**
-	 * Returns a list of all address book directories for building dropdowns.
-	 * Insulates callers from nsIAbManager.directories enumeration (legacy: hasMoreElements/getNext; TB128 may differ).
-	 * @param {nsIAbManager} abManager - From getAbManager()
-	 * @returns {{ dirNames: string[], URIs: string[] }}
+	 * Returns a list of all address book directories. Always returns a Promise (legacy: Promise.resolve(sync); TB128: async list()).
 	 */
 	function getAddressBookList(abManager) {
+		if (isTB128 && abManager && abManager.list) {
+			return abManager.list().then(function(books) {
+				var dirNames = [];
+				var URIs = [];
+				if (books && books.length) {
+					for (var i = 0; i < books.length; i++) {
+						/* AddressBookNode typically has .id and .name (or .displayName in some versions). */
+						dirNames.push(books[i].name != null ? books[i].name : (books[i].displayName != null ? books[i].displayName : books[i].id || ""));
+						URIs.push(books[i].id);
+					}
+				}
+				cachedListInfo = { dirNames: dirNames, URIs: URIs };
+				return cachedListInfo;
+			});
+		}
 		var dirNames = [];
 		var URIs = [];
 		if (!abManager || !abManager.directories)
-			return { dirNames: dirNames, URIs: URIs };
+			return Promise.resolve({ dirNames: dirNames, URIs: URIs });
 		var allDirs = abManager.directories;
 		while (allDirs.hasMoreElements()) {
 			var dir = allDirs.getNext();
@@ -78,7 +113,7 @@ var DuplicateEntriesWindowContacts = (function() {
 				URIs.push(dir.URI);
 			}
 		}
-		return { dirNames: dirNames, URIs: URIs };
+		return Promise.resolve({ dirNames: dirNames, URIs: URIs });
 	}
 
 	/**
@@ -98,13 +133,28 @@ var DuplicateEntriesWindowContacts = (function() {
 	}
 
 	/**
-	 * Returns all contact cards from a directory (wrapped: stable interface getProperty, setProperty, getPropertyNames).
-	 * For each card, context.enrichCardForComparison(card, mailLists) is called.
-	 * @param {nsIAbDirectory} directory - Address book directory
-	 * @param {object} context - Must have enrichCardForComparison(card, mailLists)
-	 * @returns {{ cards: Array, totalBefore: number }} - cards array (wrapped) and total count
+	 * Returns all contact cards from a directory. Returns a Promise (TB128: async list+get; legacy: Promise.resolve(sync)).
 	 */
 	function getAllAbCards(directory, context) {
+		if (isTB128 && directory && directory.id) {
+			/* TB128: addressBooks.contacts.list(parentId) returns contact nodes; get(id) returns full contact. */
+			return messenger.addressBooks.contacts.list(directory.id).then(function(contactNodes) {
+				var mailLists = [];
+				var abCards = [];
+				return Promise.all((contactNodes || []).map(function(node) {
+					return messenger.addressBooks.contacts.get(node.id).then(function(contact) {
+						if (!contact) return;
+						/* Skip mailing lists for now in TB128 (no isMailList on node?) */
+						var wrapped = wrapTB128Contact(contact, directory.id);
+						abCards.push(wrapped);
+					});
+				})).then(function() {
+					for (var j = 0; j < abCards.length; j++)
+						context.enrichCardForComparison(abCards[j], mailLists);
+					return { cards: abCards, totalBefore: abCards.length };
+				});
+			});
+		}
 		var abCards = [];
 		var mailLists = [];
 		var childCards = directory.QueryInterface(Components.interfaces.nsIAbDirectory).childCards;
@@ -127,16 +177,11 @@ var DuplicateEntriesWindowContacts = (function() {
 						}
 					}
 				}
-			} catch (ex) {
-				// Return empty array on error
-			}
+			} catch (ex) {}
 		}
-
-		for (var j = 0; j < abCards.length; j++) {
+		for (var j = 0; j < abCards.length; j++)
 			context.enrichCardForComparison(abCards[j], mailLists);
-		}
-
-		return { cards: abCards, totalBefore: abCards.length };
+		return Promise.resolve({ cards: abCards, totalBefore: abCards.length });
 	}
 
 	/**
@@ -161,28 +206,30 @@ var DuplicateEntriesWindowContacts = (function() {
 	}
 
 	/**
-	 * Persists card changes to the address book.
-	 * @param {nsIAbDirectory} abDir - Directory the card belongs to
-	 * @param {object} card - Card (wrapped or raw) with modified properties
-	 * @throws on failure
+	 * Persists card changes. Returns Promise (TB128: messenger.addressBooks.contacts.update; legacy: sync, Promise.resolve).
 	 */
 	function saveCard(abDir, card) {
 		var raw = (card.getRawCard && card.getRawCard()) || card;
+		if (isTB128 && raw.id) {
+			var props = raw.properties || {};
+			return messenger.addressBooks.contacts.update(raw.id, props);
+		}
 		abDir.modifyCard(raw);
+		return Promise.resolve();
 	}
 
 	/**
-	 * Deletes a card from the address book.
-	 * @param {nsIAbDirectory} abDir - Directory the card belongs to
-	 * @param {object} card - Card (wrapped or raw) to delete
-	 * @throws on failure
+	 * Deletes a card. Returns Promise (TB128: messenger.addressBooks.contacts.delete; legacy: sync, Promise.resolve).
 	 */
 	function deleteCard(abDir, card) {
 		var raw = (card.getRawCard && card.getRawCard()) || card;
+		if (isTB128 && raw.id)
+			return messenger.addressBooks.contacts.delete(raw.id);
 		var deleteCards = Components.classes["@mozilla.org/array;1"]
 			.createInstance(Components.interfaces.nsIMutableArray);
 		deleteCards.appendElement(raw, false);
 		abDir.deleteCards(deleteCards);
+		return Promise.resolve();
 	}
 
 	return {

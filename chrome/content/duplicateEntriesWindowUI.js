@@ -185,7 +185,8 @@ var DuplicateEntriesWindowUI = (function() {
 		var cards = ctx.getString('cards');
 		var n = ctx.vcards[book].length -
 			(ctx.abDir1 == ctx.abDir2 ? ctx.totalCardsDeleted1 + ctx.totalCardsDeleted2 : nDeleted);
-		document.getElementById(label).value = '(' + cards + ': ' + n + ')';
+		var el = document.getElementById(label);
+		if (el) { if (el.value !== undefined) el.value = '(' + cards + ': ' + n + ')'; el.textContent = '(' + cards + ': ' + n + ')'; }
 	}
 
 	/**
@@ -209,9 +210,17 @@ var DuplicateEntriesWindowUI = (function() {
 			max = ctx.duplicates.length;
 		}
 		ctx.progressmeter.setAttribute('value', ((max == 0 ? 1 : pos / max) * 100) + '%');
-		ctx.progresstext.value = ctx.getString(current) + " " + pos + " " + ctx.getString('of') + " " + max;
+		if (ctx.progressmeter.value !== undefined) ctx.progressmeter.value = (max == 0 ? 1 : pos / max) * 100;
+		var progVal = ctx.getString(current) + " " + pos + " " + ctx.getString('of') + " " + max;
+		if (ctx.progresstext) { if (ctx.progresstext.value !== undefined) ctx.progresstext.value = progVal; ctx.progresstext.textContent = progVal; }
 		updateDeletedInfo(ctx, 'statusAddressBook1_size', ctx.BOOK_1, ctx.totalCardsDeleted1);
 		updateDeletedInfo(ctx, 'statusAddressBook2_size', ctx.BOOK_2, ctx.totalCardsDeleted2);
+	}
+
+	/** Sets element value; supports both XUL (.value) and HTML (.textContent) for status/result fields. */
+	function setElVal(id, v) {
+		var el = document.getElementById(id);
+		if (el) { if (el.value !== undefined) el.value = v; el.textContent = v; }
 	}
 
 	/**
@@ -219,17 +228,18 @@ var DuplicateEntriesWindowUI = (function() {
 	 */
 	function showFinishedStats(ctx) {
 		var totalCardsDeleted = ctx.totalCardsDeleted1 + ctx.totalCardsDeleted2;
-		document.getElementById('resultNumBefore').value = ctx.totalCardsBefore;
-		document.getElementById('resultNumAfter').value = ctx.totalCardsBefore - totalCardsDeleted;
-		document.getElementById('resultNumRemovedMan').value = totalCardsDeleted - ctx.totalCardsDeletedAuto;
-		document.getElementById('resultNumRemovedAuto').value = ctx.totalCardsDeletedAuto;
-		document.getElementById('resultNumChanged').value = ctx.totalCardsChanged;
-		document.getElementById('resultNumSkipped').value = ctx.totalCardsSkipped;
+		setElVal('resultNumBefore', ctx.totalCardsBefore);
+		setElVal('resultNumAfter', ctx.totalCardsBefore - totalCardsDeleted);
+		setElVal('resultNumRemovedMan', totalCardsDeleted - ctx.totalCardsDeletedAuto);
+		setElVal('resultNumRemovedAuto', ctx.totalCardsDeletedAuto);
+		setElVal('resultNumChanged', ctx.totalCardsChanged);
+		setElVal('resultNumSkipped', ctx.totalCardsSkipped);
 		document.getElementById('resultConsideredFields').textContent = ctx.consideredFields
 			.filter(function(x) { return !ctx.isSet(x) && !ctx.matchablesList.includes(x); }).join(", ");
 		document.getElementById('resultIgnoredFields').textContent = ctx.ignoredFields.join(", ");
 		document.getElementById('resultDiffProps').textContent = ctx.nonequivalentProperties.join(", ");
-		document.getElementById('startbutton').setAttribute('label', ctx.getString('Restart'));
+		var sb = document.getElementById('startbutton');
+		if (sb) { sb.setAttribute('label', ctx.getString('Restart')); if (sb.tagName === 'BUTTON') sb.textContent = ctx.getString('Restart'); }
 	}
 
 	return {

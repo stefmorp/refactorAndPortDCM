@@ -16,12 +16,14 @@ var DuplicateContactsManagerAddonPrefs = (function() {
 		{ id: "extensions.duplicatecontactsmanager.docpath", type: "string" }
 	];
 
+	var isTB128 = (typeof browser !== "undefined" && browser.storage);
+
 	/**
 	 * Registers the addon's preference definitions with the platform.
-	 * Legacy: Preferences.addAll(PREF_DEFINITIONS); TB128: may use browser.storage or options_ui schema.
-	 * Call once when the options/preferences dialog loads (from Preferences.js).
+	 * Legacy: Preferences.addAll(PREF_DEFINITIONS); TB128: no-op (options use storage directly).
 	 */
 	function addAddonPrefs() {
+		if (isTB128) return;
 		if (typeof Preferences !== "undefined" && Preferences.addAll)
 			Preferences.addAll(PREF_DEFINITIONS);
 	}

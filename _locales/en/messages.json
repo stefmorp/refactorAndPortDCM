@@ -1,0 +1,21 @@
+{
+  "NoABookFound": { "message": "No address book found!" },
+  "PleasePressStart": { "message": "Please press Start." },
+  "Start": { "message": "Start" },
+  "Restart": { "message": "Restart" },
+  "SearchingForDuplicates": { "message": "Searching for duplicates..." },
+  "finished": { "message": "Finished" },
+  "to_be_kept": { "message": "to be kept" },
+  "to_be_removed": { "message": "to be removed" },
+  "cards": { "message": "cards" },
+  "of": { "message": "of" },
+  "parity": { "message": "match" },
+  "true_label": { "message": "yes" },
+  "false_label": { "message": "no" },
+  "unknown_label": { "message": "unknown" },
+  "plaintext_label": { "message": "plain text" },
+  "html_label": { "message": "HTML" },
+  "toolsmenu_items_handleduplicates_label": { "message": "Duplicate Contacts Manager…" },
+  "noMatch": { "message": "No names, email addresses, and phone numbers to compare" },
+  "matchFound": { "message": "Match found" }
+}

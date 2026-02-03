@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<!-- TB128 host for the duplicate-finder; same structure/IDs as duplicateEntriesWindow.xul so shared JS works. -->
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<meta charset="UTF-8"/>
+	<title>Find and Manage Duplicates</title>
+	<link rel="stylesheet" href="../skin/classic/duplicateContactsManager.css"/>
+</head>
+<body id="handleDuplicates-window">
+	<div id="duplicatesButtonsBox" class="hbox">
+		<button type="button" id="startbutton" disabled="false">Start</button>
+		<button type="button" id="skipnextbutton" style="visibility:visible" disabled="true">Skip &gt;</button>
+		<button type="button" id="keepnextbutton" style="visibility:visible" disabled="true">Keep both &gt;</button>
+		<button type="button" id="applynextbutton" style="visibility:visible" disabled="true">Remove one &gt;</button>
+		<span style="flex:1"></span>
+		<button type="button" id="stopbutton" style="display:none">Stop</button>
+		<button type="button" id="quitbutton" style="display:none">Quit</button>
+	</div>
+	<div id="statusBar" class="hbox">
+		<div id="statusText_container" style="flex:2"><span id="statusText">Searching for duplicates...</span></div>
+		<span style="flex:1"></span>
+		<div id="statusAddressBook1" style="flex:3;display:none">
+			<span id="statusAddressBook1_label" class="addressbookname">AddressBook1</span>
+			<span id="statusAddressBook1_size"></span>
+		</div>
+		<span style="flex:1"></span>
+		<div id="progress" style="flex:2">
+			<progress id="progressMeter" value="0" max="100" style="display:none"></progress>
+			<label id="progressText"></label>
+		</div>
+		<span style="flex:1"></span>
+		<div id="statusAddressBook2" style="flex:3;display:none">
+			<span id="statusAddressBook2_label" class="addressbookname">AddressBook2</span>
+			<span id="statusAddressBook2_size"></span>
+		</div>
+		<span style="flex:1"></span>
+	</div>
+	<div id="explanation" style="flex:1;display:none;text-align:center">
+		<div class="vbox">
+			<p class="descTitle">What's happening here?</p>
+			<p>The selected address book(s) will be searched for matching potentially duplicate entries.</p>
+			<p>If you choose two different address books, duplicates will be handled (only) across the two selected address books, otherwise within the same address book.</p>
+			<div id="addressbooklists" class="hbox"></div>
+			<p>Each time a pair of candidates is presented, you can decide to skip them, to edit and keep them both, or to possibly edit one and remove the other.</p>
+			<p>If you wish to exclude entries from being shown as potential duplicates each time, you may give them different AIM names.</p>
+			<p class="descTitle">Options</p>
+			<label><input type="checkbox" id="autoremove"/> Remove without asking all duplicates containing less information when the rest is the same between the two.</label>
+			<label><input type="checkbox" id="preservefirst"/> When using two different address books, do not automatically remove entries from the first one.</label>
+			<label><input type="checkbox" id="deferInteractive"/> First collect all potential duplicates requiring manual treatment and then present them interactively.</label>
+			<div class="hbox"><input type="text" class="slim" id="natTrunkPrefix" style="width:2.5em"/><span>National phone number trunk prefix, e.g., '1' or '0'</span></div>
+			<div class="hbox"><input type="text" class="slim" id="intCallPrefix" style="width:3.7em"/><span>International call (IDD) prefix, e.g., '011' or '00'</span></div>
+			<div class="hbox"><input type="text" class="slim" id="countryCallingCode" style="width:5.5em"/><span>Default country calling code, e.g., '+1' or '+44'</span></div>
+			<p>Fields to consider: <span class="text-line value fields" id="consideredFields"></span></p>
+			<p>Fields to ignore: <textarea id="ignoredFields" cols="90" rows="3"></textarea></p>
+		</div>
+	</div>
+	<div id="tablepane" style="flex:1;display:none">
+		<table id="AttributesTable">
+			<thead><tr><th></th><th style="flex:3"></th><th class="equivalence"></th><th style="flex:3"></th></tr></thead>
+			<tbody id="AttributesTableRows">
+				<tr id="tableheader">
+					<td id="fieldLabels" class="field"> </td>
+					<td id="headerLeft" class="keep"><label><input type="radio" name="keepSide" id="keepLeft" checked/> to be kept</label></td>
+					<td id="cardsEqu" class="equivalence"></td>
+					<td id="headerRight" class="remove"><label><input type="radio" name="keepSide" id="keepRight"/> to be removed</label></td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
+	<div id="endinfo" style="flex:1;display:none">
+		<div class="vbox">
+			<p class="descTitle">Results</p>
+			<div class="tbox">
+				<p>Number of entries before: <span id="resultNumBefore" class="value">0</span></p>
+				<p>Number of entries after: <span id="resultNumAfter" class="value">0</span></p>
+				<p>Entries removed manually: <span id="resultNumRemovedMan" class="value">0</span></p>
+				<p>Entries removed automatically: <span id="resultNumRemovedAuto" class="value">0</span></p>
+				<p>Entries changed: <span id="resultNumChanged" class="value">0</span></p>
+				<p>Entry pairs skipped: <span id="resultNumSkipped" class="value">0</span></p>
+				<p>Field types found with non-equivalent values: </p>
+				<p class="text-line value fields" id="resultDiffProps"></p>
+				<p>Fields to consider: </p>
+				<p class="text-line value fields" id="resultConsideredFields"></p>
+				<p>Field types ignored: </p>
+				<p class="text-line value fields" id="resultIgnoredFields"></p>
+			</div>
+			<p>Development site: <a id="resultDevSiteUrl" href="https://github.com/DDvO/Duplicate-Contacts-Manager">https://github.com/DDvO/Duplicate-Contacts-Manager</a></p>
+		</div>
+	</div>
+	<div id="bottom" class="statusbar"><span style="flex:1"></span></div>
+
+	<script src="duplicateEntriesWindowState.js"></script>
+	<script src="duplicateEntriesWindowStrings.js"></script>
+	<script src="duplicateEntriesWindowContacts.js"></script>
+	<script src="duplicateEntriesWindowFields.js"></script>
+	<script src="duplicateEntriesWindowPrefs.js"></script>
+	<script src="duplicateEntriesWindowMatching.js"></script>
+	<script src="duplicateEntriesWindowCardValues.js"></script>
+	<script src="duplicateEntriesWindowComparison.js"></script>
+	<script src="duplicateEntriesWindowWidgets.js"></script>
+	<script src="duplicateEntriesWindowUI.js"></script>
+	<script src="duplicateEntriesWindowDisplay.js"></script>
+	<script src="duplicateEntriesWindowSearch.js"></script>
+	<script src="duplicateEntriesWindow.js"></script>
+	<script>
+		document.body.addEventListener("DOMContentLoaded", function() {
+			DuplicateEntriesWindow.init().catch(function(e) { console.error(e); });
+		});
+		window.addEventListener("unload", function() { DuplicateEntriesWindow.OnUnloadWindow(); });
+	</script>
+</body>
+</html>

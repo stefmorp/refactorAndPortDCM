@@ -13,14 +13,23 @@ var DuplicateEntriesWindowStrings = (function() {
 	var BUNDLE_URL = "chrome://duplicatecontactsmanager/locale/duplicateContactsManager.properties";
 	var FALLBACK_BUNDLE_ID = "bundle_duplicateContactsManager";
 
+	/** TB128: use browser.i18n; legacy: use string bundle. */
+	var isTB128 = (typeof browser !== "undefined" && browser.i18n && browser.i18n.getMessage);
+
 	/**
-	 * Creates the string bundle for ctx (legacy implementation) and returns a getString(name) function.
-	 * Sets ctx.stringBundle. For TB128, a second implementation can use browser.i18n.getMessage without changing callers.
+	 * Creates the string bundle for ctx (legacy) or returns getString using browser.i18n (TB128).
 	 * Call once from init; then assign ctx.getString = DuplicateEntriesWindowStrings.createStringProvider(ctx).
-	 * @param {object} ctx - Window context (will get ctx.stringBundle set)
+	 * @param {object} ctx - Window context (will get ctx.stringBundle set in legacy)
 	 * @returns {function(string): string} getString(name)
 	 */
 	function createStringProvider(ctx) {
+		if (isTB128) {
+			/* Fallback to key name when message is missing (e.g. _locales not yet complete). */
+			return function(name) {
+				var msg = browser.i18n.getMessage(name);
+				return (msg !== "" && msg != null) ? msg : name;
+			};
+		}
 		try {
 			var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 			ctx.stringBundle = Services.strings.createBundle(BUNDLE_URL);
